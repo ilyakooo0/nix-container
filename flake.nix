@@ -72,9 +72,7 @@
           # Host package set, for the wrapper app below.
           pkgsHost = nixpkgs.legacyPackages.${system};
 
-          # skopeo writes the OCI archive's ref.name from the *destination*
-          # string, not from the image config — so the wrapper app must spell
-          # these out, else the archive loads as `untagged`.
+          # Name/tag baked into the image's OCI config.
           imageName = "nix-container";
           imageTag = "latest";
 
@@ -184,27 +182,25 @@
             };
           };
 
-          # `nix run . -- <path>` writes an OCI archive tagged
-          # <imageName>:<imageTag>. The raw `image.copyTo` is a passthrough
-          # (`skopeo copy nix:<image> "$@"`), so an `oci-archive:<path>` with no
-          # ref loads as `untagged`; this bakes the ref into the destination.
-          copyToOCI = pkgsHost.writeShellApplication {
-            name = "copy-to-oci";
-            text = ''
-              out="''${1:-image.tar}"
-              exec ${image.copyTo}/bin/copy-to "oci-archive:$out:${imageName}:${imageTag}"
-            '';
-          };
+          # `nix run . -- init|start` runs the bundled `c` manager script. Its
+          # build step shells back to `nix run .#image`; the script finds the
+          # flake from its own (store) location, so this works from a checkout
+          # or straight from `nix run github:…/nix-container`.
+          cApp = pkgsHost.writeShellScriptBin "c" ''
+            exec ${pkgsHost.fish}/bin/fish ${self}/c "$@"
+          '';
         in
         {
           apps = {
-            # nix run . -- <path>   → OCI archive tagged <name>:<tag>,
-            # loadable with `container image load -i <path>`.
-            default = flake-utils.lib.mkApp { drv = copyToOCI; };
+            # nix run . -- init|start   → build+load+create / start a container
+            default = flake-utils.lib.mkApp { drv = cApp; };
 
-            # Generic skopeo passthrough for any other destination, e.g.
-            #   nix run .#copyTo -- docker://ghcr.io/me/img:latest
-            copyTo = flake-utils.lib.mkApp { drv = image.copyTo; };
+            # nix run .#image -- <skopeo-dest>  → copy the image anywhere, e.g.
+            #   nix run .#image -- oci-archive:image.tar:nix-container:latest
+            #   nix run .#image -- docker://ghcr.io/me/img:latest
+            # skopeo (`skopeo copy nix:<image> "$@"`) takes the ref.name from
+            # the destination, so spell out the tag to avoid an `untagged` load.
+            image = flake-utils.lib.mkApp { drv = image.copyTo; };
           };
         }
       );

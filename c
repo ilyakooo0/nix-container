@@ -11,7 +11,7 @@ switch $argv[1]
     case init
         # Build the OCI archive into a temp dir, load it, then clean up.
         set -l tmp (mktemp -d)
-        nix run $flake -- $tmp/image.tar.gz; and container image load --input $tmp/image.tar.gz
+        nix run "$flake#image" -- "oci-archive:$tmp/image.tar.gz:nix-container:latest"; and container image load --input $tmp/image.tar.gz
         set -l rc $status
         rm -rf $tmp
         test $rc -eq 0; or exit $rc
