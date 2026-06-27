@@ -5,8 +5,8 @@ A Nix flake that builds an **OCI image** (via
 Apple's [`container`](https://github.com/apple/container) CLI on macOS.
 
 It's a plain, single-process image — no NixOS, no systemd — defined in
-[`flake.nix`](./flake.nix). It runs `fish` by default; you choose what it ships
-via a per-project `container.nix`.
+[`flake.nix`](./flake.nix). `init` runs your host login shell (`$SHELL`); you
+choose what else it ships via a per-project `container.nix`.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ is **required**; there is no default set.
 ```nix
 # ./container.nix
 { pkgs, nur }: with pkgs; [
-  fish       # the default cmd is /bin/fish, so include it (or change config.cmd)
+  fish       # `init` runs your host shell — include it (here, fish)
   coreutils
   git
   go
@@ -55,7 +55,7 @@ that holds a `container.nix`; the container is named after that directory.
 # build the image, load it, and create the container (named after $PWD):
 nix run github:ilyakooo0/nix-container -- init
 
-# start it and attach — drops you into fish:
+# start it and attach — drops you into your shell:
 nix run github:ilyakooo0/nix-container -- start
 ```
 

@@ -51,9 +51,14 @@ switch $argv[1]
         set -l mounts -v "$PWD:/workspace"
         test -d $HOME/.config; and set -a mounts -v "$HOME/.config:/root/.config"
 
+        # Run the host's login shell (by name) instead of the image's default
+        # cmd. The shell must be in the package set.
+        set -l shell fish
+        test -n "$SHELL"; and set shell (path basename $SHELL)
+
         # Replace any existing container of the same name.
         container rm --force $name 2>/dev/null
-        container create --name $name --ssh -it --cwd /workspace $mounts $argv $image
+        container create --name $name --ssh -it --cwd /workspace $mounts $argv $image /bin/$shell
     case start
         container start -ai $name
     case '*'

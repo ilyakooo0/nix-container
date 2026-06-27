@@ -77,8 +77,9 @@
           imageTag = "latest";
 
           # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function.
-          # The default `cmd` is /bin/fish, so the package set should include
-          # `fish` (warned about below if missing) or override `config.cmd`.
+          # The default `cmd` is /bin/fish, but `c init` runs your host login
+          # shell instead — so include that shell in the package set (a missing
+          # shell is warned about below).
           mkImage =
             packages:
             let
@@ -86,9 +87,17 @@
                 pkgs = pkgsLinux;
                 nur = nurPkgs;
               };
+              hasShell = builtins.any (
+                p:
+                builtins.elem (p.pname or "") [
+                  "fish"
+                  "bash"
+                  "zsh"
+                ]
+              ) pkgList;
             in
-            pkgsLinux.lib.warnIf (!builtins.any (p: (p.pname or "") == "fish") pkgList)
-              "nix-container: config.cmd is /bin/fish but the package set has no `fish` — the container will fail to start unless something provides /bin/fish (or change config.cmd)."
+            pkgsLinux.lib.warnIf (!hasShell)
+              "nix-container: the package set has no shell (fish/bash/zsh) — the container's command may not exist (`c init` runs your host shell)."
               (
                 n2c.buildImage {
                   name = imageName;
