@@ -111,10 +111,12 @@
           '';
 
           # The curated tool set baked into the image. Drop a `container.nix`
-          # (`pkgs: [ ... ]`) next to where you run `c init` to replace this with
-          # your own list — see README.
+          # (`{ pkgs, nur }: [ ... ]`) next to where you run `c init` to replace
+          # this with your own list — see README.
           defaultPackages =
-            pkgs: with pkgs; [
+            { pkgs, nur }:
+            with pkgs;
+            [
               bashInteractive
               fish
               openssh
@@ -124,7 +126,7 @@
               zellij
               micro
               helix
-              nurPkgs.repos.charmbracelet.crush
+              nur.repos.charmbracelet.crush
 
               # LLM tools
               git
@@ -156,9 +158,10 @@
               gcc # provides cc/gcc; pulls in binutils (ld) via its closure
             ];
 
-          # Build the OCI image from a `pkgs: [ ... ]` package function. The fish
-          # prompt config is always added; the default `cmd` is /bin/fish, so a
-          # custom package set should include `fish` (or change `config.cmd`).
+          # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function.
+          # The fish prompt config is always added; the default `cmd` is
+          # /bin/fish, so a custom package set should include `fish` (or change
+          # `config.cmd`).
           mkImage =
             packages:
             n2c.buildImage {
@@ -169,7 +172,10 @@
               # A plain, single-process root filesystem. No NixOS, no systemd.
               copyToRoot = pkgsLinux.buildEnv {
                 name = "root";
-                paths = packages pkgsLinux ++ [ fishRoot ];
+                paths = packages {
+                  pkgs = pkgsLinux;
+                  nur = nurPkgs;
+                } ++ [ fishRoot ];
                 pathsToLink = [
                   "/bin"
                   "/root"
@@ -222,7 +228,7 @@
           lib = {
             inherit mkImage;
             # skopeo copy app (`skopeo copy nix:<image> "$@"`) for an image built
-            # from a `pkgs: [ ... ]` function.
+            # from a `{ pkgs, nur }: [ ... ]` function.
             copyWith = packages: (mkImage packages).copyTo;
           };
         }

@@ -91,16 +91,18 @@ nix run github:ilyakooo0/nix-container#image -- docker-daemon:nix-container:late
 
 The image ships a curated tool set (`defaultPackages` in
 [`flake.nix`](./flake.nix)). To use your own set **without forking**, drop a
-`container.nix` in the directory you run `init` from — a `pkgs`-function
-returning the package list:
+`container.nix` in the directory you run `init` from — a `{ pkgs, nur }`
+function returning the package list (`nur` is [NUR](https://github.com/nix-community/NUR),
+for packages outside nixpkgs):
 
 ```nix
 # ./container.nix
-pkgs: with pkgs; [
+{ pkgs, nur }: with pkgs; [
   fish       # the default cmd is /bin/fish, so include it (or change config.cmd)
   coreutils
   go
   terraform
+  nur.repos.charmbracelet.crush
 ]
 ```
 
