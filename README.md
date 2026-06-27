@@ -1,4 +1,4 @@
-# container-nix
+# nix-container
 
 A Nix flake that builds an **OCI image** (via
 [`nix2container`](https://github.com/nlewo/nix2container)) for running with
