@@ -55,14 +55,19 @@ container start -ai nixos
 
 You land in `fish`. Exit the shell to stop the container.
 
-> **Shortcut:** the [`c`](./c) script wraps create/start and names the container
-> after the current directory (handy for per-project containers):
+> **Shortcut:** the [`c`](./c) script bundles the workflow and names the
+> container after the current directory (handy for per-project containers). It
+> resolves the flake from its own location, so you can symlink it onto your
+> `$PATH` and run it from any project:
 >
 > ```sh
-> ./c init                 # create; append create args to add mounts, e.g.
-> ./c init -v $PWD:/work    # (mounts can only be set at creation time)
+> ./c init                 # build + load the image, then create the container
+> ./c init -v $PWD:/work    # add create-time mounts (set only at creation)
 > ./c start                # start and attach
 > ```
+>
+> `c init` builds the archive in a temp dir, loads it, and deletes it — so no
+> `image.tar.gz` is left lying around.
 
 ## Re-running after a rebuild
 
