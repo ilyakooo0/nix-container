@@ -76,10 +76,11 @@
           imageName = "nix-container";
           imageTag = "latest";
 
-          # Fish prompt config, installed at /root/.config/fish/config.fish
-          # (fish reads $HOME/.config/fish). Built on the host arch — it's just a
-          # text file, so no Linux builder is needed.
-          fishConfig = pkgsHost.writeText "config.fish" ''
+          # Fish prompt config. Installed at /etc/fish/prompt.fish and loaded via
+          # `fish --no-config --init-command` (see `cmd` below), NOT from
+          # $HOME/.config/fish — so the `~/.config` mount can't shadow it. Built
+          # on the host arch (just a text file), so no Linux builder is needed.
+          fishConfig = pkgsHost.writeText "prompt.fish" ''
             # No welcome banner.
             set -g fish_greeting
 
@@ -105,10 +106,10 @@
             end
           '';
 
-          # Lay the config out at the path fish reads.
-          fishRoot = pkgsHost.runCommand "fish-config-root" { } ''
-            mkdir -p "$out/root/.config/fish"
-            cp ${fishConfig} "$out/root/.config/fish/config.fish"
+          # Lay the prompt out at the path the cmd sources.
+          fishRoot = pkgsHost.runCommand "fish-prompt" { } ''
+            mkdir -p "$out/etc/fish"
+            cp ${fishConfig} "$out/etc/fish/prompt.fish"
           '';
 
           # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function.
@@ -144,7 +145,7 @@
                   ];
                 pathsToLink = [
                   "/bin"
-                  "/root"
+                  "/etc/fish"
                   "/etc/ssl"
                 ];
               };
@@ -152,11 +153,16 @@
               initializeNixDatabase = true;
 
               config = {
-                # `cmd` (not `entrypoint`): it's the default command and is
-                # *replaced* by `container run … -- <cmd>`. An entrypoint would be
-                # prepended instead, so `run … -- /bin/sh` would become
-                # `/bin/bash /bin/sh` and fail with "cannot execute binary file".
-                cmd = [ "/bin/fish" ];
+                # `cmd` (not `entrypoint`): the default command, *replaced* by any
+                # command passed to `container run/create`. `--no-config` skips
+                # $HOME/.config/fish (so a mounted ~/.config can't override the
+                # prompt); `--init-command` loads the bundled prompt instead.
+                cmd = [
+                  "/bin/fish"
+                  "--no-config"
+                  "--init-command"
+                  "source /etc/fish/prompt.fish"
+                ];
                 env = [
                   "PATH=/bin"
                   "HOME=/root"

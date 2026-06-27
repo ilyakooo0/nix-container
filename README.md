@@ -66,7 +66,8 @@ nix run github:ilyakooo0/nix-container -- start
 - `init` builds the OCI archive in a temp dir, loads it into `container`,
   deletes the temp file, then (re)creates the container. It mounts the current
   directory at `/workspace` (the container's working directory) and your
-  `~/.config` at `/root/.config`.
+  `~/.config` at `/root/.config` (fish runs with `--no-config`, so this won't
+  override its bundled prompt; other tools still read it).
 - `--ssh` forwards your host SSH agent socket into the container (so `git` over
   SSH works with your keys).
 - Add more mounts by passing them through (mounts can only be set at creation):
