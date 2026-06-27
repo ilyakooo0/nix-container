@@ -41,6 +41,8 @@ is **required**; there is no default set.
 ```
 
 Your host shell (`$SHELL`) is added and run automatically — no need to list it.
+**Nix itself** is always included too (with CA certs and `nix-command`/`flakes`
+enabled, single-user), so you can run `nix` inside the container.
 
 Point at a different file with `-c`/`--config`:
 

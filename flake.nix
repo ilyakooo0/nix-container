@@ -108,10 +108,19 @@
                   # buildEnv only *symlinks* paths (never runs them), so build it
                   # on the host arch — the tree is arch-neutral and links the
                   # (substituted) Linux store paths, sparing the Linux builder.
+                  #
+                  # Nix itself (+ CA certs) is always shipped, so every container
+                  # can use Nix; `initializeNixDatabase` registers the baked store.
                   copyToRoot = pkgsHost.buildEnv {
                     name = "root";
-                    paths = pkgList;
-                    pathsToLink = [ "/bin" ];
+                    paths = pkgList ++ [
+                      pkgsLinux.nix
+                      pkgsLinux.cacert
+                    ];
+                    pathsToLink = [
+                      "/bin"
+                      "/etc/ssl"
+                    ];
                   };
 
                   initializeNixDatabase = true;
@@ -127,6 +136,10 @@
                       "HOME=/root"
                       # Marker so shells/scripts can detect they're in here.
                       "NIX_CONTAINER=1"
+                      # Make the bundled Nix usable: TLS for substituters/flakes,
+                      # flake commands on, and single-user (no daemon/nixbld).
+                      "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+                      "NIX_CONFIG=experimental-features = nix-command flakes\nbuild-users-group =\nsandbox = false"
                     ];
                   };
                 }
