@@ -76,74 +76,99 @@
           imageName = "nix-container";
           imageTag = "latest";
 
+          # Fish prompt config, installed at /root/.config/fish/config.fish
+          # (fish reads $HOME/.config/fish). Built on the host arch — it's just a
+          # text file, so no Linux builder is needed.
+          fishConfig = pkgsHost.writeText "config.fish" ''
+            # No welcome banner.
+            set -g fish_greeting
+
+            # Define the prompt as a function so fish renders it before every
+            # command; at top level it would run once at startup and be ignored.
+            function fish_prompt
+                set -l nix_shell_info
+                if set -q IN_NIX_SHELL; or set -q IN_NIX_RUN
+                    set nix_shell_info ' ❄️'
+                end
+
+                set -l cwd (prompt_pwd)
+
+                set -l bookmark_info
+                if jj root 2>/dev/null >/dev/null
+                    set -l jj_bookmark (jj log -r 'heads(::@ & bookmarks())' -T 'local_bookmarks ++ "\n"' --no-graph 2>/dev/null | tail -1)
+                    if test -n "$jj_bookmark"
+                        set bookmark_info ' ' (set_color brmagenta) $jj_bookmark (set_color normal)
+                    end
+                end
+
+                echo -n -s (set_color $fish_color_cwd) $cwd (set_color normal) $bookmark_info ' 🏗️' $nix_shell_info '> '
+            end
+          '';
+
+          # Lay the config out at the path fish reads.
+          fishRoot = pkgsHost.runCommand "fish-config-root" { } ''
+            mkdir -p "$out/root/.config/fish"
+            cp ${fishConfig} "$out/root/.config/fish/config.fish"
+          '';
+
           # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function.
-          # The default `cmd` is /bin/fish; `c init` runs your host login shell
-          # instead and adds it automatically (see `copyWithShell`). The warning
-          # below only catches an image left with no shell at all.
+          # The image always runs /bin/fish; fish, its prompt config, and Nix are
+          # bundled automatically, so `container.nix` lists only your extras.
           mkImage =
             packages:
-            let
-              pkgList = packages {
-                pkgs = pkgsLinux;
-                nur = nurPkgs;
+            n2c.buildImage {
+              name = imageName;
+              tag = imageTag;
+              inherit arch;
+
+              # A plain, single-process root filesystem. No NixOS, no systemd.
+              # buildEnv only *symlinks* paths (never runs them), so build it on
+              # the host arch — the tree is arch-neutral and links the
+              # (substituted) Linux store paths, sparing the Linux builder.
+              #
+              # Always shipped: fish (the cmd) + its prompt, and Nix (+ CA certs)
+              # so every container can use Nix; `initializeNixDatabase` registers
+              # the baked store.
+              copyToRoot = pkgsHost.buildEnv {
+                name = "root";
+                paths =
+                  packages {
+                    pkgs = pkgsLinux;
+                    nur = nurPkgs;
+                  }
+                  ++ [
+                    pkgsLinux.fish
+                    fishRoot
+                    pkgsLinux.nix
+                    pkgsLinux.cacert
+                  ];
+                pathsToLink = [
+                  "/bin"
+                  "/root"
+                  "/etc/ssl"
+                ];
               };
-              hasShell = builtins.any (
-                p:
-                builtins.elem (p.pname or "") [
-                  "fish"
-                  "bash"
-                  "zsh"
-                ]
-              ) pkgList;
-            in
-            pkgsLinux.lib.warnIf (!hasShell)
-              "nix-container: the package set has no shell (fish/bash/zsh) — the container's command may not exist (`c init` runs your host shell)."
-              (
-                n2c.buildImage {
-                  name = imageName;
-                  tag = imageTag;
-                  inherit arch;
 
-                  # A plain, single-process root filesystem. No NixOS, no systemd.
-                  # buildEnv only *symlinks* paths (never runs them), so build it
-                  # on the host arch — the tree is arch-neutral and links the
-                  # (substituted) Linux store paths, sparing the Linux builder.
-                  #
-                  # Nix itself (+ CA certs) is always shipped, so every container
-                  # can use Nix; `initializeNixDatabase` registers the baked store.
-                  copyToRoot = pkgsHost.buildEnv {
-                    name = "root";
-                    paths = pkgList ++ [
-                      pkgsLinux.nix
-                      pkgsLinux.cacert
-                    ];
-                    pathsToLink = [
-                      "/bin"
-                      "/etc/ssl"
-                    ];
-                  };
+              initializeNixDatabase = true;
 
-                  initializeNixDatabase = true;
-
-                  config = {
-                    # `cmd` (not `entrypoint`): it's the default command and is
-                    # *replaced* by `container run … -- <cmd>`. An entrypoint would
-                    # be prepended instead, so `run … -- /bin/sh` would become
-                    # `/bin/bash /bin/sh` and fail with "cannot execute binary file".
-                    cmd = [ "/bin/fish" ];
-                    env = [
-                      "PATH=/bin"
-                      "HOME=/root"
-                      # Marker so shells/scripts can detect they're in here.
-                      "NIX_CONTAINER=1"
-                      # Make the bundled Nix usable: TLS for substituters/flakes,
-                      # flake commands on, and single-user (no daemon/nixbld).
-                      "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
-                      "NIX_CONFIG=experimental-features = nix-command flakes\nbuild-users-group =\nsandbox = false"
-                    ];
-                  };
-                }
-              );
+              config = {
+                # `cmd` (not `entrypoint`): it's the default command and is
+                # *replaced* by `container run … -- <cmd>`. An entrypoint would be
+                # prepended instead, so `run … -- /bin/sh` would become
+                # `/bin/bash /bin/sh` and fail with "cannot execute binary file".
+                cmd = [ "/bin/fish" ];
+                env = [
+                  "PATH=/bin"
+                  "HOME=/root"
+                  # Marker so shells/scripts can detect they're in here.
+                  "NIX_CONTAINER=1"
+                  # Make the bundled Nix usable: TLS for substituters/flakes,
+                  # flake commands on, and single-user (no daemon/nixbld).
+                  "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+                  "NIX_CONFIG=experimental-features = nix-command flakes\nbuild-users-group =\nsandbox = false"
+                ];
+              };
+            };
 
           # `nix run . -- init|start` runs the bundled `c` manager script. Its
           # `init` builds the image from the project's `container.nix` (via
@@ -169,15 +194,6 @@
             # skopeo copy app (`skopeo copy nix:<image> "$@"`) for an image built
             # from a `{ pkgs, nur }: [ ... ]` function.
             copyWith = packages: (mkImage packages).copyTo;
-            # Like `copyWith`, but also adds the named shell package (when it
-            # exists in nixpkgs) so `c init` can run the host shell without it
-            # being listed in `container.nix`.
-            copyWithShell =
-              shell: packages:
-              (mkImage (
-                { pkgs, nur }:
-                packages { inherit pkgs nur; } ++ pkgs.lib.optional (pkgs ? ${shell}) pkgs.${shell}
-              )).copyTo;
           };
         }
       );
