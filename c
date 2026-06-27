@@ -45,9 +45,14 @@ switch $argv[1]
         rm -rf $tmp
         test $rc -eq 0; or exit $rc
 
+        # Mount the project at /workspace (the default cwd) and host ~/.config.
+        # (Mounting ~/.config shadows the image's bundled fish prompt config.)
+        set -l mounts -v "$PWD:/workspace"
+        test -d $HOME/.config; and set -a mounts -v "$HOME/.config:/root/.config"
+
         # Replace any existing container of the same name.
         container rm --force $name 2>/dev/null
-        container create --name $name --ssh -it $argv nix-container:latest
+        container create --name $name --ssh -it --cwd /workspace $mounts $argv nix-container:latest
     case start
         container start -ai $name
     case '*'

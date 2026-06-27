@@ -60,14 +60,16 @@ nix run github:ilyakooo0/nix-container -- start
 ```
 
 - `init` builds the OCI archive in a temp dir, loads it into `container`,
-  deletes the temp file, then runs `container create --name <dir> --ssh -it`.
+  deletes the temp file, then (re)creates the container. It mounts the current
+  directory at `/workspace` (the container's working directory) and your
+  `~/.config` at `/root/.config` (so your host config — including a fish config,
+  if any — takes over the bundled prompt).
 - `--ssh` forwards your host SSH agent socket into the container (so `git` over
   SSH works with your keys).
-- Mounts can only be set at creation, so pass them to `init` (forwarded to
-  `container create`):
+- Add more mounts by passing them through (mounts can only be set at creation):
 
   ```sh
-  nix run github:ilyakooo0/nix-container -- init -v $PWD:/work
+  nix run github:ilyakooo0/nix-container -- init -v $HOME/data:/data
   ```
 
 Working from a checkout, [`./c init`](./c) / `./c start` are equivalent — and
