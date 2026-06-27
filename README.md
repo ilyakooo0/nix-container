@@ -5,10 +5,8 @@ A Nix flake that builds an **OCI image** (via
 Apple's [`container`](https://github.com/apple/container) CLI on macOS.
 
 It's a plain, single-process image — no NixOS, no systemd — defined in
-[`flake.nix`](./flake.nix). The default command is `fish` (with a configured
-prompt), and the image ships a handful of dev/LLM tools: `git`, `jujutsu`,
-`ripgrep`, `fd`, `jq`, `nodejs`, `python3`, a Rust + C toolchain,
-`charmbracelet.crush`, `openssh`, and more.
+[`flake.nix`](./flake.nix). It runs `fish` by default (with a configured
+prompt); you choose what it ships via a per-project `container.nix`.
 
 ## Prerequisites
 
@@ -24,10 +22,34 @@ prompt), and the image ships a handful of dev/LLM tools: `git`, `jujutsu`,
 
 [builders]: https://nix.dev/manual/nix/latest/advanced-topics/distributed-builds
 
+## Packages
+
+`init` builds the image from a **`container.nix`** in the current directory — a
+`{ pkgs, nur }` function returning the package list (`nur` is
+[NUR](https://github.com/nix-community/NUR), for packages outside nixpkgs). It
+is **required**; there is no default set.
+
+```nix
+# ./container.nix
+{ pkgs, nur }: with pkgs; [
+  fish       # the default cmd is /bin/fish, so include it (or change config.cmd)
+  coreutils
+  git
+  go
+  nur.repos.charmbracelet.crush
+]
+```
+
+Point at a different file with `-c`/`--config`:
+
+```sh
+nix run github:ilyakooo0/nix-container -- init --config envs/ci.nix
+```
+
 ## Quick start
 
-No clone needed — `nix run` drives everything. Run it from a project directory;
-the container is named after that directory.
+No clone needed — `nix run` drives everything. Run it from a project directory
+that holds a `container.nix`; the container is named after that directory.
 
 ```sh
 # build the image, load it, and create the container (named after $PWD):
@@ -62,66 +84,21 @@ container image rm nix-container:latest
 nix run github:ilyakooo0/nix-container -- init
 ```
 
-## Manual steps
-
-`init` is just a wrapper; you can run the pieces yourself for more control. The
-`image` app is nix2container's skopeo wrapper (`skopeo copy nix:<image> "$@"`) —
-it takes the ref name from the destination, so spell out the tag:
-
-```sh
-# 1. build a tagged OCI archive
-nix run github:ilyakooo0/nix-container#image -- oci-archive:image.tar:nix-container:latest
-
-# 2. load, create, start
-container image load --input image.tar
-container create --name myctr --ssh -it nix-container:latest
-container start -ai myctr
-```
-
-## Other image destinations
-
-The same `image` app can copy anywhere skopeo can:
-
-```sh
-nix run github:ilyakooo0/nix-container#image -- docker://ghcr.io/me/img:latest   # push to a registry
-nix run github:ilyakooo0/nix-container#image -- docker-daemon:nix-container:latest # local Docker daemon
-```
-
-## Configuring packages
-
-The image ships a curated tool set (`defaultPackages` in
-[`flake.nix`](./flake.nix)). To use your own set **without forking**, drop a
-`container.nix` in the directory you run `init` from — a `{ pkgs, nur }`
-function returning the package list (`nur` is [NUR](https://github.com/nix-community/NUR),
-for packages outside nixpkgs):
-
-```nix
-# ./container.nix
-{ pkgs, nur }: with pkgs; [
-  fish       # the default cmd is /bin/fish, so include it (or change config.cmd)
-  coreutils
-  go
-  terraform
-  nur.repos.charmbracelet.crush
-]
-```
-
-`nix run github:ilyakooo0/nix-container -- init` (and `./c init`) then builds an
-image with **exactly** those packages, replacing the default set. It's a full
-replacement, so include the basics you need.
-
-Point at a different file with `-c`/`--config`:
-
-```sh
-nix run github:ilyakooo0/nix-container -- init --config envs/ci.nix
-```
-
 ## Customize further
 
-Fork or clone to change what isn't per-project — the default package set,
-`config.cmd`/`env`, or the image name — by editing `defaultPackages` / `mkImage`
-in [`flake.nix`](./flake.nix). `mkImage` and `lib.<system>.copyWith` are exposed
-for building images from your own flake.
+Fork or clone to change what isn't per-project — `config.cmd`/`env`, the image
+name, or the fish prompt — in [`flake.nix`](./flake.nix). The flake also exposes
+build helpers, both taking a `{ pkgs, nur }: [ ... ]` function:
+
+- `lib.<system>.mkImage` → an OCI image.
+- `lib.<system>.copyWith` → a skopeo copy app, for building/pushing the image
+  anywhere skopeo can write (e.g. a registry):
+
+  ```sh
+  drv=$(nix build --no-link --print-out-paths --impure --expr \
+    '(builtins.getFlake "github:ilyakooo0/nix-container").lib.${builtins.currentSystem}.copyWith (import ./container.nix)')
+  $drv/bin/copy-to docker://ghcr.io/me/img:latest
+  ```
 
 The flake uses `flake-utils` over `{aarch64,x86_64}-{darwin,linux}`; the host
 system maps to the matching Linux target automatically (an Intel Mac builds an
@@ -129,9 +106,9 @@ system maps to the matching Linux target automatically (an Intel Mac builds an
 
 ## How it works
 
-- **Contents** (`copyToRoot`) are built from `pkgsLinux` → the Linux builder.
+- **Contents** are built from `pkgsLinux` → the Linux builder.
 - **Assembly** (`nix2container` + the `skopeo` copy) runs on your Mac, so a
-  single `nix run` produces a loadable archive.
+  single `init` produces a loadable archive.
 - Apple's `container` runs each container in its own lightweight Linux VM and
   consumes standard OCI images — no `--privileged` or systemd needed.
 

@@ -110,54 +110,6 @@
             cp ${fishConfig} "$out/root/.config/fish/config.fish"
           '';
 
-          # The curated tool set baked into the image. Drop a `container.nix`
-          # (`{ pkgs, nur }: [ ... ]`) next to where you run `c init` to replace
-          # this with your own list — see README.
-          defaultPackages =
-            { pkgs, nur }:
-            with pkgs;
-            [
-              bashInteractive
-              fish
-              openssh
-              coreutils-full
-              btop
-              jujutsu
-              zellij
-              micro
-              helix
-              nur.repos.charmbracelet.crush
-
-              # LLM tools
-              git
-              ripgrep
-              fd
-              jq
-              curl
-              wget
-              gnused
-              gnugrep
-              gawk
-              findutils
-              gnutar
-              gzip
-              unzip
-              less
-              which
-              tree
-              nodejs
-              python3
-
-              # rust
-              rustc
-              cargo
-              rustfmt
-              clippy
-
-              # C toolchain — rustc links final binaries through `cc`/`ld`.
-              gcc # provides cc/gcc; pulls in binutils (ld) via its closure
-            ];
-
           # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function.
           # The fish prompt config is always added; the default `cmd` is
           # /bin/fish, so a custom package set should include `fish` (or change
@@ -198,12 +150,11 @@
               };
             };
 
-          image = mkImage defaultPackages;
-
           # `nix run . -- init|start` runs the bundled `c` manager script. Its
-          # build step shells back to `nix run .#image`; the script finds the
-          # flake from its own (store) location, so this works from a checkout
-          # or straight from `nix run github:…/nix-container`.
+          # `init` builds the image from the project's `container.nix` (via
+          # `lib.copyWith`); the script finds the flake from its own (store)
+          # location, so this works from a checkout or straight from
+          # `nix run github:…/nix-container`.
           cApp = pkgsHost.writeShellScriptBin "c" ''
             exec ${pkgsHost.fish}/bin/fish ${self}/c "$@"
           '';
@@ -212,13 +163,6 @@
           apps = {
             # nix run . -- init|start   → build+load+create / start a container
             default = flake-utils.lib.mkApp { drv = cApp; };
-
-            # nix run .#image -- <skopeo-dest>  → copy the image anywhere, e.g.
-            #   nix run .#image -- oci-archive:image.tar:nix-container:latest
-            #   nix run .#image -- docker://ghcr.io/me/img:latest
-            # skopeo (`skopeo copy nix:<image> "$@"`) takes the ref.name from
-            # the destination, so spell out the tag to avoid an `untagged` load.
-            image = flake-utils.lib.mkApp { drv = image.copyTo; };
           };
 
           # Build helpers. `c init` uses `copyWith` to honour a per-project
