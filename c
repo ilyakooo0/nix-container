@@ -1,6 +1,6 @@
 #!/usr/bin/env fish
 # Manage a container named after the current directory.
-#   c init [-c FILE] [extra create args]   build + load the image, then create it
+#   c init [-c FILE] [extra create args]   build + load the image, then (re)create it
 #                                          (packages from FILE, default ./container.nix)
 #   c start                                start it and attach
 
@@ -45,6 +45,8 @@ switch $argv[1]
         rm -rf $tmp
         test $rc -eq 0; or exit $rc
 
+        # Replace any existing container of the same name.
+        container rm --force $name 2>/dev/null
         container create --name $name --ssh -it $argv nix-container:latest
     case start
         container start -ai $name

@@ -75,12 +75,10 @@ Working from a checkout, [`./c init`](./c) / `./c start` are equivalent — and
 
 ## Re-running after a rebuild
 
-`container` keeps the loaded image and the created container, so remove them
-before re-initialising:
+Just run `init` again — it reloads the image and replaces the existing container
+(removing the old one first), so there's nothing to clean up:
 
 ```sh
-container rm <dir>                       # the container is named after the directory
-container image rm nix-container:latest
 nix run github:ilyakooo0/nix-container -- init
 ```
 
