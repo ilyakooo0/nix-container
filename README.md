@@ -14,11 +14,12 @@ choose what else it ships via a per-project `container.nix`.
 - Apple's [`container`](https://github.com/apple/container) CLI installed, with
   services started: `container system start` (first run downloads a Linux
   kernel).
-- A **Linux builder** — the image *contents* are Linux binaries, which can't be
-  built on macOS. Use a [remote builder][builders] or, on Apple Silicon, the
-  `nix-darwin` `linux-builder`. With one configured, `nix` dispatches Linux
-  builds to it automatically (most packages also come prebuilt from the binary
-  cache, so the builder is only needed for the uncached bits).
+- A **Linux builder** *only if you use packages that aren't in the binary
+  cache*. The image is assembled entirely on macOS — the root filesystem is just
+  a host-built symlink tree over the **substituted** Linux store paths — so a
+  fully-cached package set needs no builder. Compiling a Linux package that
+  `cache.nixos.org` doesn't have does, though: use a [remote builder][builders]
+  or, on Apple Silicon, the `nix-darwin` `linux-builder`.
 
 [builders]: https://nix.dev/manual/nix/latest/advanced-topics/distributed-builds
 
@@ -106,9 +107,12 @@ system maps to the matching Linux target automatically (an Intel Mac builds an
 
 ## How it works
 
-- **Contents** are built from `pkgsLinux` → the Linux builder.
-- **Assembly** (`nix2container` + the `skopeo` copy) runs on your Mac, so a
-  single `init` produces a loadable archive.
+- **Contents** are Linux store paths — downloaded prebuilt from the binary cache
+  (only built on a Linux builder if not cached).
+- **Assembly** runs entirely on your Mac: `copyToRoot` is a *host-arch* `buildEnv`
+  symlink tree over those Linux paths (symlinks are arch-neutral), and
+  `nix2container` + `skopeo` package it — so for a cached set, `init` produces a
+  loadable Linux image with no Linux build at all.
 - Apple's `container` runs each container in its own lightweight Linux VM and
   consumes standard OCI images — no `--privileged` or systemd needed.
 

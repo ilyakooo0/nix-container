@@ -105,7 +105,10 @@
                   inherit arch;
 
                   # A plain, single-process root filesystem. No NixOS, no systemd.
-                  copyToRoot = pkgsLinux.buildEnv {
+                  # buildEnv only *symlinks* paths (never runs them), so build it
+                  # on the host arch — the tree is arch-neutral and links the
+                  # (substituted) Linux store paths, sparing the Linux builder.
+                  copyToRoot = pkgsHost.buildEnv {
                     name = "root";
                     paths = pkgList;
                     pathsToLink = [ "/bin" ];
