@@ -7,8 +7,8 @@
 set -l name (path basename $PWD)
 # The flake lives next to this script (resolve symlinks so it works from $PATH too).
 set -l flake (path dirname (path resolve (status filename)))
-# Image ref this script loads and runs (the archive tag + `create` reference).
-set -l image nix-container:latest
+# Per-directory image ref this script loads and runs (archive tag + `create`).
+set -l image "nix-container-$name:latest"
 
 switch $argv[1]
     case init
