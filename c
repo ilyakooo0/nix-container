@@ -27,12 +27,17 @@ switch $argv[1]
             exit 1
         end
 
-        # Build an image with exactly the packages from $config, into a temp
-        # dir, load it, then clean up.
+        # Host login shell (by name): run as the container cmd and added to the
+        # image automatically, so it needn't be listed in container.nix.
+        set -l shell fish
+        test -n "$SHELL"; and set shell (path basename $SHELL)
+
+        # Build an image with the packages from $config (plus the shell) into a
+        # temp dir, load it, then clean up.
         set -l tmp (mktemp -d)
         set -l archive $tmp/image.tar.gz
         set -lx NIX_CONTAINER_PKGS (path resolve $config)
-        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWith (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\"))"
+        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWithShell \"$shell\" (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\"))"
         set -l copyer (nix build --impure --no-link --print-out-paths --expr "$expr")
         set -l rc $status
         if test $rc -eq 0
@@ -50,11 +55,6 @@ switch $argv[1]
         # Mount the project at /workspace (the default cwd) and host ~/.config.
         set -l mounts -v "$PWD:/workspace"
         test -d $HOME/.config; and set -a mounts -v "$HOME/.config:/root/.config"
-
-        # Run the host's login shell (by name) instead of the image's default
-        # cmd. The shell must be in the package set.
-        set -l shell fish
-        test -n "$SHELL"; and set shell (path basename $SHELL)
 
         # Replace any existing container of the same name.
         container rm --force $name 2>/dev/null

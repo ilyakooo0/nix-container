@@ -32,13 +32,14 @@ is **required**; there is no default set.
 ```nix
 # ./container.nix
 { pkgs, nur }: with pkgs; [
-  fish       # `init` runs your host shell — include it (here, fish)
   coreutils
   git
   go
   nur.repos.charmbracelet.crush
 ]
 ```
+
+Your host shell (`$SHELL`) is added and run automatically — no need to list it.
 
 Point at a different file with `-c`/`--config`:
 

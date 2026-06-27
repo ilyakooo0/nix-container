@@ -77,9 +77,9 @@
           imageTag = "latest";
 
           # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function.
-          # The default `cmd` is /bin/fish, but `c init` runs your host login
-          # shell instead — so include that shell in the package set (a missing
-          # shell is warned about below).
+          # The default `cmd` is /bin/fish; `c init` runs your host login shell
+          # instead and adds it automatically (see `copyWithShell`). The warning
+          # below only catches an image left with no shell at all.
           mkImage =
             packages:
             let
@@ -153,6 +153,15 @@
             # skopeo copy app (`skopeo copy nix:<image> "$@"`) for an image built
             # from a `{ pkgs, nur }: [ ... ]` function.
             copyWith = packages: (mkImage packages).copyTo;
+            # Like `copyWith`, but also adds the named shell package (when it
+            # exists in nixpkgs) so `c init` can run the host shell without it
+            # being listed in `container.nix`.
+            copyWithShell =
+              shell: packages:
+              (mkImage (
+                { pkgs, nur }:
+                packages { inherit pkgs nur; } ++ pkgs.lib.optional (pkgs ? ${shell}) pkgs.${shell}
+              )).copyTo;
           };
         }
       );
