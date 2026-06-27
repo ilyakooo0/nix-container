@@ -76,44 +76,9 @@
           imageName = "nix-container";
           imageTag = "latest";
 
-          # Fish prompt config, installed at /root/.config/fish/config.fish
-          # (fish reads $HOME/.config/fish).
-          fishConfig = pkgsLinux.writeText "config.fish" ''
-            # No welcome banner.
-            set -g fish_greeting
-
-            # Define the prompt as a function so fish renders it before every
-            # command; at top level it would run once at startup and be ignored.
-            function fish_prompt
-                set -l nix_shell_info
-                if set -q IN_NIX_SHELL; or set -q IN_NIX_RUN
-                    set nix_shell_info ' ❄️'
-                end
-
-                set -l cwd (prompt_pwd)
-
-                set -l bookmark_info
-                if jj root 2>/dev/null >/dev/null
-                    set -l jj_bookmark (jj log -r 'heads(::@ & bookmarks())' -T 'local_bookmarks ++ "\n"' --no-graph 2>/dev/null | tail -1)
-                    if test -n "$jj_bookmark"
-                        set bookmark_info ' ' (set_color brmagenta) $jj_bookmark (set_color normal)
-                    end
-                end
-
-                echo -n -s (set_color $fish_color_cwd) $cwd (set_color normal) $bookmark_info ' 🏗️' $nix_shell_info '> '
-            end
-          '';
-
-          # Lay the config out at the path fish reads.
-          fishRoot = pkgsLinux.runCommand "fish-config-root" { } ''
-            mkdir -p "$out/root/.config/fish"
-            cp ${fishConfig} "$out/root/.config/fish/config.fish"
-          '';
-
           # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function.
-          # The fish prompt config is always added; the default `cmd` is
-          # /bin/fish, so the package set should include `fish` (warned about
-          # below if missing) or override `config.cmd`.
+          # The default `cmd` is /bin/fish, so the package set should include
+          # `fish` (warned about below if missing) or override `config.cmd`.
           mkImage =
             packages:
             let
@@ -133,11 +98,8 @@
                   # A plain, single-process root filesystem. No NixOS, no systemd.
                   copyToRoot = pkgsLinux.buildEnv {
                     name = "root";
-                    paths = pkgList ++ [ fishRoot ];
-                    pathsToLink = [
-                      "/bin"
-                      "/root"
-                    ];
+                    paths = pkgList;
+                    pathsToLink = [ "/bin" ];
                   };
 
                   initializeNixDatabase = true;
@@ -150,7 +112,6 @@
                     cmd = [ "/bin/fish" ];
                     env = [
                       "PATH=/bin"
-                      # fish reads its prompt from $HOME/.config/fish/config.fish.
                       "HOME=/root"
                     ];
                   };

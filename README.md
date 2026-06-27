@@ -5,8 +5,8 @@ A Nix flake that builds an **OCI image** (via
 Apple's [`container`](https://github.com/apple/container) CLI on macOS.
 
 It's a plain, single-process image — no NixOS, no systemd — defined in
-[`flake.nix`](./flake.nix). It runs `fish` by default (with a configured
-prompt); you choose what it ships via a per-project `container.nix`.
+[`flake.nix`](./flake.nix). It runs `fish` by default; you choose what it ships
+via a per-project `container.nix`.
 
 ## Prerequisites
 
@@ -62,8 +62,7 @@ nix run github:ilyakooo0/nix-container -- start
 - `init` builds the OCI archive in a temp dir, loads it into `container`,
   deletes the temp file, then (re)creates the container. It mounts the current
   directory at `/workspace` (the container's working directory) and your
-  `~/.config` at `/root/.config` (so your host config — including a fish config,
-  if any — takes over the bundled prompt).
+  `~/.config` at `/root/.config`.
 - `--ssh` forwards your host SSH agent socket into the container (so `git` over
   SSH works with your keys).
 - Add more mounts by passing them through (mounts can only be set at creation):
@@ -86,9 +85,9 @@ nix run github:ilyakooo0/nix-container -- init
 
 ## Customize further
 
-Fork or clone to change what isn't per-project — `config.cmd`/`env`, the image
-name, or the fish prompt — in [`flake.nix`](./flake.nix). The flake also exposes
-build helpers, both taking a `{ pkgs, nur }: [ ... ]` function:
+Fork or clone to change what isn't per-project — `config.cmd`/`env` or the image
+name — in [`flake.nix`](./flake.nix). The flake also exposes build helpers, both
+taking a `{ pkgs, nur }: [ ... ]` function:
 
 - `lib.<system>.mkImage` → an OCI image.
 - `lib.<system>.copyWith` → a skopeo copy app, for building/pushing the image

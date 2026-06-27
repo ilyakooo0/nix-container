@@ -48,7 +48,6 @@ switch $argv[1]
         test $rc -eq 0; or exit $rc
 
         # Mount the project at /workspace (the default cwd) and host ~/.config.
-        # (Mounting ~/.config shadows the image's bundled fish prompt config.)
         set -l mounts -v "$PWD:/workspace"
         test -d $HOME/.config; and set -a mounts -v "$HOME/.config:/root/.config"
 
