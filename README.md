@@ -30,7 +30,7 @@ prompt), and the image ships a handful of dev/LLM tools: `git`, `jujutsu`,
 
 `nix run` builds the Linux contents (on your Linux builder) and writes a tagged
 OCI archive locally via `skopeo`. Pass the output path; the image is tagged
-`nixos-container:latest`.
+`nix-container:latest`.
 
 ```sh
 nix run . -- image.tar.gz
@@ -45,7 +45,7 @@ container image load --input image.tar.gz
 ### 3. Create and start the container
 
 ```sh
-container create --name nixos --ssh -it nixos-container:latest
+container create --name nixos --ssh -it nix-container:latest
 container start -ai nixos
 ```
 
@@ -72,9 +72,9 @@ new build, remove the old ones first:
 ```sh
 nix run . -- image.tar.gz            # rebuild the archive
 container rm nixos                   # remove the old container (stop it first if running)
-container image rm nixos-container:latest
+container image rm nix-container:latest
 container image load --input image.tar.gz
-container create --name nixos --ssh -it nixos-container:latest
+container create --name nixos --ssh -it nix-container:latest
 container start -ai nixos
 ```
 
@@ -85,7 +85,7 @@ container start -ai nixos
 
 ```sh
 nix run .#copyTo -- docker://ghcr.io/me/nixos:latest    # push to a registry
-nix run .#copyTo -- docker-daemon:nixos-container:latest # local Docker daemon
+nix run .#copyTo -- docker-daemon:nix-container:latest # local Docker daemon
 ```
 
 ## Customize

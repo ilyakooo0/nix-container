@@ -7,7 +7,7 @@ set -l name (path basename $PWD)
 
 switch $argv[1]
     case init
-        container create --name $name --ssh -it $argv[2..-1] nixos-container:latest
+        container create --name $name --ssh -it $argv[2..-1] nix-container:latest
     case start
         container start -ai $name
     case '*'

@@ -75,7 +75,7 @@
           # skopeo writes the OCI archive's ref.name from the *destination*
           # string, not from the image config — so the wrapper app must spell
           # these out, else the archive loads as `untagged`.
-          imageName = "nixos-container";
+          imageName = "nix-container";
           imageTag = "latest";
 
           # Fish prompt config, installed at /root/.config/fish/config.fish
