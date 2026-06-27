@@ -113,6 +113,8 @@
                     env = [
                       "PATH=/bin"
                       "HOME=/root"
+                      # Marker so shells/scripts can detect they're in here.
+                      "NIX_CONTAINER=1"
                     ];
                   };
                 }
