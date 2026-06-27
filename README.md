@@ -91,11 +91,11 @@ nix run github:ilyakooo0/nix-container#image -- docker-daemon:nix-container:late
 
 The image ships a curated tool set (`defaultPackages` in
 [`flake.nix`](./flake.nix)). To use your own set **without forking**, drop a
-`nix-container.nix` in the directory you run `init` from — a `pkgs`-function
+`container.nix` in the directory you run `init` from — a `pkgs`-function
 returning the package list:
 
 ```nix
-# ./nix-container.nix
+# ./container.nix
 pkgs: with pkgs; [
   fish       # the default cmd is /bin/fish, so include it (or change config.cmd)
   coreutils

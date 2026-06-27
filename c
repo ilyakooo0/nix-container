@@ -1,7 +1,7 @@
 #!/usr/bin/env fish
 # Manage a container named after the current directory.
 #   c init [extra create args]   build + load the image, then create the container
-#                                 (uses ./nix-container.nix for packages if present)
+#                                 (uses ./container.nix for packages if present)
 #   c start                      start it and attach
 
 set -l name (path basename $PWD)
@@ -15,9 +15,9 @@ switch $argv[1]
         set -l archive $tmp/image.tar.gz
         set -l rc 0
 
-        if test -e nix-container.nix
+        if test -e container.nix
             # Per-project package set: build an image with exactly these packages.
-            set -lx NIX_CONTAINER_PKGS (path resolve nix-container.nix)
+            set -lx NIX_CONTAINER_PKGS (path resolve container.nix)
             set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWith (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\"))"
             set -l copyer (nix build --impure --no-link --print-out-paths --expr "$expr")
             set rc $status

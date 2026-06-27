@@ -110,7 +110,7 @@
             cp ${fishConfig} "$out/root/.config/fish/config.fish"
           '';
 
-          # The curated tool set baked into the image. Drop a `nix-container.nix`
+          # The curated tool set baked into the image. Drop a `container.nix`
           # (`pkgs: [ ... ]`) next to where you run `c init` to replace this with
           # your own list — see README.
           defaultPackages =
@@ -216,9 +216,9 @@
           };
 
           # Build helpers. `c init` uses `copyWith` to honour a per-project
-          # `nix-container.nix`:
+          # `container.nix`:
           #   (builtins.getFlake "github:…/nix-container")
-          #     .lib.<system>.copyWith (import ./nix-container.nix)
+          #     .lib.<system>.copyWith (import ./container.nix)
           lib = {
             inherit mkImage;
             # skopeo copy app (`skopeo copy nix:<image> "$@"`) for an image built
