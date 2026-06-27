@@ -108,6 +108,12 @@ pkgs: with pkgs; [
 image with **exactly** those packages, replacing the default set. It's a full
 replacement, so include the basics you need.
 
+Point at a different file with `-c`/`--config`:
+
+```sh
+nix run github:ilyakooo0/nix-container -- init --config envs/ci.nix
+```
+
 ## Customize further
 
 Fork or clone to change what isn't per-project — the default package set,
