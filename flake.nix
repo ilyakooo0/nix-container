@@ -110,77 +110,89 @@
             cp ${fishConfig} "$out/root/.config/fish/config.fish"
           '';
 
-          image = n2c.buildImage {
-            name = imageName;
-            tag = imageTag;
-            inherit arch;
+          # The curated tool set baked into the image. Drop a `nix-container.nix`
+          # (`pkgs: [ ... ]`) next to where you run `c init` to replace this with
+          # your own list — see README.
+          defaultPackages =
+            pkgs: with pkgs; [
+              bashInteractive
+              fish
+              openssh
+              coreutils-full
+              btop
+              jujutsu
+              zellij
+              micro
+              helix
+              nurPkgs.repos.charmbracelet.crush
 
-            # A plain, single-process root filesystem. No NixOS, no systemd.
-            copyToRoot = pkgsLinux.buildEnv {
-              name = "root";
-              paths = with pkgsLinux; [
-                bashInteractive
-                fish
-                fishRoot
-                openssh
-                coreutils-full
-                btop
-                jujutsu
-                zellij
-                micro
-                helix
-                nurPkgs.repos.charmbracelet.crush
+              # LLM tools
+              git
+              ripgrep
+              fd
+              jq
+              curl
+              wget
+              gnused
+              gnugrep
+              gawk
+              findutils
+              gnutar
+              gzip
+              unzip
+              less
+              which
+              tree
+              nodejs
+              python3
 
-                # LLM tools
-                git
-                ripgrep
-                fd
-                jq
-                curl
-                wget
-                gnused
-                gnugrep
-                gawk
-                findutils
-                gnutar
-                gzip
-                unzip
-                less
-                which
-                tree
-                nodejs
-                python3
+              # rust
+              rustc
+              cargo
+              rustfmt
+              clippy
 
-                # rust
-                rustc
-                cargo
-                rustfmt
-                clippy
+              # C toolchain — rustc links final binaries through `cc`/`ld`.
+              gcc # provides cc/gcc; pulls in binutils (ld) via its closure
+            ];
 
-                # C toolchain — rustc links final binaries through `cc`/`ld`.
-                gcc # provides cc/gcc; pulls in binutils (ld) via its closure
-              ];
-              pathsToLink = [
-                "/bin"
-                "/root"
-              ];
+          # Build the OCI image from a `pkgs: [ ... ]` package function. The fish
+          # prompt config is always added; the default `cmd` is /bin/fish, so a
+          # custom package set should include `fish` (or change `config.cmd`).
+          mkImage =
+            packages:
+            n2c.buildImage {
+              name = imageName;
+              tag = imageTag;
+              inherit arch;
+
+              # A plain, single-process root filesystem. No NixOS, no systemd.
+              copyToRoot = pkgsLinux.buildEnv {
+                name = "root";
+                paths = packages pkgsLinux ++ [ fishRoot ];
+                pathsToLink = [
+                  "/bin"
+                  "/root"
+                ];
+              };
+
+              initializeNixDatabase = true;
+
+              config = {
+                # `cmd` (not `entrypoint`): it's the default command and is
+                # *replaced* by `container run … -- <cmd>`. An entrypoint would
+                # be prepended instead, so `run … -- /bin/sh` would become
+                # `/bin/bash /bin/sh` and fail with "cannot execute binary file".
+                cmd = [ "/bin/fish" ];
+                env = [
+                  "PATH=/bin"
+                  # fish reads its prompt from $HOME/.config/fish/config.fish.
+                  "HOME=/root"
+                ];
+              };
             };
 
-            initializeNixDatabase = true;
-
-            config = {
-              # `cmd` (not `entrypoint`): it's the default command and is
-              # *replaced* by `container run … -- <cmd>`. An entrypoint would be
-              # prepended instead, so `run … -- /bin/sh` would become
-              # `/bin/bash /bin/sh` and fail with "cannot execute binary file".
-              cmd = [ "/bin/fish" ];
-              env = [
-                "PATH=/bin"
-                # fish reads its prompt from $HOME/.config/fish/config.fish.
-                "HOME=/root"
-              ];
-            };
-          };
+          image = mkImage defaultPackages;
 
           # `nix run . -- init|start` runs the bundled `c` manager script. Its
           # build step shells back to `nix run .#image`; the script finds the
@@ -201,6 +213,17 @@
             # skopeo (`skopeo copy nix:<image> "$@"`) takes the ref.name from
             # the destination, so spell out the tag to avoid an `untagged` load.
             image = flake-utils.lib.mkApp { drv = image.copyTo; };
+          };
+
+          # Build helpers. `c init` uses `copyWith` to honour a per-project
+          # `nix-container.nix`:
+          #   (builtins.getFlake "github:…/nix-container")
+          #     .lib.<system>.copyWith (import ./nix-container.nix)
+          lib = {
+            inherit mkImage;
+            # skopeo copy app (`skopeo copy nix:<image> "$@"`) for an image built
+            # from a `pkgs: [ ... ]` function.
+            copyWith = packages: (mkImage packages).copyTo;
           };
         }
       );

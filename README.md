@@ -87,13 +87,33 @@ nix run github:ilyakooo0/nix-container#image -- docker://ghcr.io/me/img:latest  
 nix run github:ilyakooo0/nix-container#image -- docker-daemon:nix-container:latest # local Docker daemon
 ```
 
-## Customize
+## Configuring packages
 
-Fork or clone, then edit the `buildImage` call in [`flake.nix`](./flake.nix):
+The image ships a curated tool set (`defaultPackages` in
+[`flake.nix`](./flake.nix)). To use your own set **without forking**, drop a
+`nix-container.nix` in the directory you run `init` from — a `pkgs`-function
+returning the package list:
 
-- Add packages to `copyToRoot.paths`.
-- Change the default process via `config.cmd`.
-- Add env vars via `config.env`.
+```nix
+# ./nix-container.nix
+pkgs: with pkgs; [
+  fish       # the default cmd is /bin/fish, so include it (or change config.cmd)
+  coreutils
+  go
+  terraform
+]
+```
+
+`nix run github:ilyakooo0/nix-container -- init` (and `./c init`) then builds an
+image with **exactly** those packages, replacing the default set. It's a full
+replacement, so include the basics you need.
+
+## Customize further
+
+Fork or clone to change what isn't per-project — the default package set,
+`config.cmd`/`env`, or the image name — by editing `defaultPackages` / `mkImage`
+in [`flake.nix`](./flake.nix). `mkImage` and `lib.<system>.copyWith` are exposed
+for building images from your own flake.
 
 The flake uses `flake-utils` over `{aarch64,x86_64}-{darwin,linux}`; the host
 system maps to the matching Linux target automatically (an Intel Mac builds an

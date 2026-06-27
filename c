@@ -1,6 +1,7 @@
 #!/usr/bin/env fish
 # Manage a container named after the current directory.
 #   c init [extra create args]   build + load the image, then create the container
+#                                 (uses ./nix-container.nix for packages if present)
 #   c start                      start it and attach
 
 set -l name (path basename $PWD)
@@ -11,10 +12,32 @@ switch $argv[1]
     case init
         # Build the OCI archive into a temp dir, load it, then clean up.
         set -l tmp (mktemp -d)
-        nix run "$flake#image" -- "oci-archive:$tmp/image.tar.gz:nix-container:latest"; and container image load --input $tmp/image.tar.gz
-        set -l rc $status
+        set -l archive $tmp/image.tar.gz
+        set -l rc 0
+
+        if test -e nix-container.nix
+            # Per-project package set: build an image with exactly these packages.
+            set -lx NIX_CONTAINER_PKGS (path resolve nix-container.nix)
+            set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWith (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\"))"
+            set -l copyer (nix build --impure --no-link --print-out-paths --expr "$expr")
+            set rc $status
+            if test $rc -eq 0
+                $copyer/bin/copy-to "oci-archive:$archive:nix-container:latest"
+                set rc $status
+            end
+        else
+            nix run "$flake#image" -- "oci-archive:$archive:nix-container:latest"
+            set rc $status
+        end
+
+        if test $rc -eq 0
+            container image load --input $archive
+            set rc $status
+        end
+
         rm -rf $tmp
         test $rc -eq 0; or exit $rc
+
         container create --name $name --ssh -it $argv[2..-1] nix-container:latest
     case start
         container start -ai $name
