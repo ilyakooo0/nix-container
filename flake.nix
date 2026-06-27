@@ -112,43 +112,50 @@
 
           # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function.
           # The fish prompt config is always added; the default `cmd` is
-          # /bin/fish, so a custom package set should include `fish` (or change
-          # `config.cmd`).
+          # /bin/fish, so the package set should include `fish` (warned about
+          # below if missing) or override `config.cmd`.
           mkImage =
             packages:
-            n2c.buildImage {
-              name = imageName;
-              tag = imageTag;
-              inherit arch;
-
-              # A plain, single-process root filesystem. No NixOS, no systemd.
-              copyToRoot = pkgsLinux.buildEnv {
-                name = "root";
-                paths = packages {
-                  pkgs = pkgsLinux;
-                  nur = nurPkgs;
-                } ++ [ fishRoot ];
-                pathsToLink = [
-                  "/bin"
-                  "/root"
-                ];
+            let
+              pkgList = packages {
+                pkgs = pkgsLinux;
+                nur = nurPkgs;
               };
+            in
+            pkgsLinux.lib.warnIf (!builtins.any (p: (p.pname or "") == "fish") pkgList)
+              "nix-container: config.cmd is /bin/fish but the package set has no `fish` — the container will fail to start unless something provides /bin/fish (or change config.cmd)."
+              (
+                n2c.buildImage {
+                  name = imageName;
+                  tag = imageTag;
+                  inherit arch;
 
-              initializeNixDatabase = true;
+                  # A plain, single-process root filesystem. No NixOS, no systemd.
+                  copyToRoot = pkgsLinux.buildEnv {
+                    name = "root";
+                    paths = pkgList ++ [ fishRoot ];
+                    pathsToLink = [
+                      "/bin"
+                      "/root"
+                    ];
+                  };
 
-              config = {
-                # `cmd` (not `entrypoint`): it's the default command and is
-                # *replaced* by `container run … -- <cmd>`. An entrypoint would
-                # be prepended instead, so `run … -- /bin/sh` would become
-                # `/bin/bash /bin/sh` and fail with "cannot execute binary file".
-                cmd = [ "/bin/fish" ];
-                env = [
-                  "PATH=/bin"
-                  # fish reads its prompt from $HOME/.config/fish/config.fish.
-                  "HOME=/root"
-                ];
-              };
-            };
+                  initializeNixDatabase = true;
+
+                  config = {
+                    # `cmd` (not `entrypoint`): it's the default command and is
+                    # *replaced* by `container run … -- <cmd>`. An entrypoint would
+                    # be prepended instead, so `run … -- /bin/sh` would become
+                    # `/bin/bash /bin/sh` and fail with "cannot execute binary file".
+                    cmd = [ "/bin/fish" ];
+                    env = [
+                      "PATH=/bin"
+                      # fish reads its prompt from $HOME/.config/fish/config.fish.
+                      "HOME=/root"
+                    ];
+                  };
+                }
+              );
 
           # `nix run . -- init|start` runs the bundled `c` manager script. Its
           # `init` builds the image from the project's `container.nix` (via

@@ -7,6 +7,8 @@
 set -l name (path basename $PWD)
 # The flake lives next to this script (resolve symlinks so it works from $PATH too).
 set -l flake (path dirname (path resolve (status filename)))
+# Image ref this script loads and runs (the archive tag + `create` reference).
+set -l image nix-container:latest
 
 switch $argv[1]
     case init
@@ -34,7 +36,7 @@ switch $argv[1]
         set -l copyer (nix build --impure --no-link --print-out-paths --expr "$expr")
         set -l rc $status
         if test $rc -eq 0
-            $copyer/bin/copy-to "oci-archive:$archive:nix-container:latest"
+            $copyer/bin/copy-to "oci-archive:$archive:$image"
             set rc $status
         end
         if test $rc -eq 0
@@ -52,7 +54,7 @@ switch $argv[1]
 
         # Replace any existing container of the same name.
         container rm --force $name 2>/dev/null
-        container create --name $name --ssh -it --cwd /workspace $mounts $argv nix-container:latest
+        container create --name $name --ssh -it --cwd /workspace $mounts $argv $image
     case start
         container start -ai $name
     case '*'
