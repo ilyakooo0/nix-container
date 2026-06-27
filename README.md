@@ -12,17 +12,23 @@ prompt), and the image ships a handful of dev/LLM tools: `git`, `jujutsu`,
 
 ## Prerequisites
 
-- Apple's `container` CLI installed, with services started:
-  `container system start` (first run downloads a Linux kernel).
-- A **Linux builder** — the image *contents* are Linux binaries and can't be
-  built on macOS. `internal.iko.soy` (aarch64-linux) is already configured, so
-  `nix` dispatches to it automatically.
+- [Nix](https://nixos.org/download/) with flakes enabled.
+- Apple's [`container`](https://github.com/apple/container) CLI installed, with
+  services started: `container system start` (first run downloads a Linux
+  kernel).
+- A **Linux builder** — the image *contents* are Linux binaries, which can't be
+  built on macOS. Use a [remote builder][builders] or, on Apple Silicon, the
+  `nix-darwin` `linux-builder`. With one configured, `nix` dispatches Linux
+  builds to it automatically (most packages also come prebuilt from the binary
+  cache, so the builder is only needed for the uncached bits).
+
+[builders]: https://nix.dev/manual/nix/latest/advanced-topics/distributed-builds
 
 ## Steps
 
 ### 1. Build the image archive
 
-`nix run` builds the Linux contents (on the remote builder) and writes a tagged
+`nix run` builds the Linux contents (on your Linux builder) and writes a tagged
 OCI archive locally via `skopeo`. Pass the output path; the image is tagged
 `nixos-container:latest`.
 
@@ -48,6 +54,15 @@ container start -ai nixos
 - `-it` / `-ai` give an interactive TTY; `start -ai` attaches to it.
 
 You land in `fish`. Exit the shell to stop the container.
+
+> **Shortcut:** the [`c`](./c) script wraps create/start and names the container
+> after the current directory (handy for per-project containers):
+>
+> ```sh
+> ./c init                 # create; append create args to add mounts, e.g.
+> ./c init -v $PWD:/work    # (mounts can only be set at creation time)
+> ./c start                # start and attach
+> ```
 
 ## Re-running after a rebuild
 
@@ -92,3 +107,7 @@ system maps to the matching Linux target automatically (an Intel Mac builds an
   single `nix run` produces a loadable archive.
 - Apple's `container` runs each container in its own lightweight Linux VM and
   consumes standard OCI images — no `--privileged` or systemd needed.
+
+## License
+
+[MIT](./LICENSE).

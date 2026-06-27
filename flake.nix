@@ -78,8 +78,8 @@
           imageName = "nixos-container";
           imageTag = "latest";
 
-          # Fish prompt config, copied from smol-nix's mkSmol.nix. Installed at
-          # /root/.config/fish/config.fish (fish reads $HOME/.config/fish).
+          # Fish prompt config, installed at /root/.config/fish/config.fish
+          # (fish reads $HOME/.config/fish).
           fishConfig = pkgsLinux.writeText "config.fish" ''
             # No welcome banner.
             set -g fish_greeting
