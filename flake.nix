@@ -142,11 +142,17 @@
                     fishRoot
                     pkgsLinux.nix
                     pkgsLinux.cacert
+                    # Networking glue glibc needs: /etc/nsswitch.conf (+passwd,
+                    # group) so DNS/host lookups resolve, and /etc/protocols,
+                    # /etc/services. Without these, hostname resolution fails.
+                    pkgsLinux.fakeNss
+                    pkgsLinux.iana-etc
                   ];
+                # Link all of /etc so the above files (nsswitch.conf, protocols,
+                # services, passwd, group, ssl certs, fish prompt) are present.
                 pathsToLink = [
                   "/bin"
-                  "/etc/fish"
-                  "/etc/ssl"
+                  "/etc"
                 ];
               };
 
@@ -168,9 +174,11 @@
                   "HOME=/root"
                   # Marker so shells/scripts can detect they're in here.
                   "NIX_CONTAINER=1"
-                  # Make the bundled Nix usable: TLS for substituters/flakes,
-                  # flake commands on, and single-user (no daemon/nixbld).
+                  # CA trust for every TLS client (curl/git/…) and Nix.
+                  "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
                   "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+                  # Make the bundled Nix usable: flake commands on, and
+                  # single-user (no daemon/nixbld).
                   "NIX_CONFIG=experimental-features = nix-command flakes\nbuild-users-group =\nsandbox = false"
                 ];
               };
