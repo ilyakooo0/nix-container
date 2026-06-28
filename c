@@ -73,14 +73,16 @@ switch $argv[1]
             set term $TERM
         end
 
-        # Replace any existing container of the same name. The image's cmd is
-        # zellij (`c start` attaches to it), so no command is passed here.
+        # Replace any existing container of the same name, then create it running
+        # zellij in a session named after the project (`<dir>-container`). This
+        # overrides the image's default plain-zellij cmd; `c start` attaches to it.
         container rm --force $name 2>/dev/null
         # The image only lays down /bin and /etc, so /tmp and /run don't exist;
         # without them anything that writes temp files (zellij, build tools, …)
         # fails with ENOENT. Mount writable tmpfs at both.
         container create --name $name --ssh -it -e "TERM=$term" \
-            --tmpfs /tmp --tmpfs /run --memory 8g --cwd /workspace $mounts $argv $image
+            --tmpfs /tmp --tmpfs /run --memory 8g --cwd /workspace $mounts $argv \
+            $image /bin/zellij --session "$name-container"
     case start
         # Start the container and attach to its cmd (zellij). TERM was baked into
         # the container env at create time (`-e TERM`), which survives this path.

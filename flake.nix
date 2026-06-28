@@ -133,9 +133,10 @@
 
               config = {
                 # `cmd` (not `entrypoint`): the default command, *replaced* by any
-                # command passed to `container run/create`. It's zellij — the
-                # session `c start` attaches to via `container start -ai`; exiting
-                # it (PID1) stops the container.
+                # command passed to `container run/create`. Plain zellij here;
+                # `c init` overrides it with `zellij --session <dir>-container` so
+                # the session is named per project. `c start` attaches via
+                # `container start -ai`; exiting zellij (PID1) stops the container.
                 cmd = [ "/bin/zellij" ];
                 env = [
                   "PATH=/bin"
