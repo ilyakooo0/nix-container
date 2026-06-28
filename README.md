@@ -34,7 +34,6 @@ is **required**; there is no default set.
 ```nix
 # ./container.nix
 { pkgs, nur }: with pkgs; [
-  coreutils
   git
   go
   nur.repos.charmbracelet.crush
@@ -42,9 +41,9 @@ is **required**; there is no default set.
 ```
 
 Your **host login shell** (detected by `c init`, bash fallback), **coreutils**,
-**Nix** itself (with CA certs and `nix-command`/`flakes` enabled, single-user),
-and the ncurses **terminfo** database are always included — no need to list them.
-`c start` launches [`zellij`](https://zellij.dev), so include it in `container.nix`.
+[**zellij**](https://zellij.dev) (the session `c start` launches), **Nix** itself
+(with CA certs and `nix-command`/`flakes` enabled, single-user), and the ncurses
+**terminfo** database are always included — no need to list them.
 
 Point at a different file with `-c`/`--config`:
 

@@ -117,6 +117,8 @@
                     # The terminfo database (+ tput/clear/reset) so TUIs find the
                     # entry for whatever TERM `c` passes in and render correctly.
                     pkgsLinux.ncurses
+                    # The session `c start` always launches.
+                    pkgsLinux.zellij
                   ];
                 # Link all of /etc so the above files (nsswitch.conf, protocols,
                 # services, passwd, group, ssl certs) are present.
@@ -160,7 +162,7 @@
 
           # `nix run . -- init|start` runs the bundled `c` manager script. Its
           # `init` builds the image from the project's `container.nix` (via
-          # `lib.copyWith`); the script finds the flake from its own (store)
+          # `lib.copyWithShell`); the script finds the flake from its own (store)
           # location, so this works from a checkout or straight from
           # `nix run github:…/nix-container`.
           cApp = pkgsHost.writeShellScriptBin "c" ''
@@ -173,15 +175,15 @@
             default = flake-utils.lib.mkApp { drv = cApp; };
           };
 
-          # Build helpers. `c init` uses `copyWith` to honour a per-project
-          # `container.nix`:
+          # Build helpers honour a per-project `container.nix`. `c init` uses
+          # `copyWithShell` (host shell baked in); `copyWith` is the generic form:
           #   (builtins.getFlake "github:…/nix-container")
           #     .lib.<system>.copyWith (import ./container.nix)
           lib = {
             inherit mkImage;
-            # skopeo copy app (`skopeo copy nix:<image> "$@"`) for an image built
-            # from a `{ pkgs, nur }: [ ... ]` function. Defaults the shell (cmd +
-            # $SHELL) to bash; use `copyWithShell` to pick another.
+            # Build the image's `copyTo` script (a skopeo-copy wrapper) from a
+            # `{ pkgs, nur }: [ ... ]` function. Defaults the shell (cmd + $SHELL)
+            # to bash; use `copyWithShell` to pick another.
             copyWith = packages: (mkImage "bash" packages).copyTo;
             # Like `copyWith`, but for the named shell — `c init` passes the host
             # login shell, which is added to the image and used as cmd + $SHELL
