@@ -27,18 +27,25 @@ per-project `container.nix`.
 
 ## Packages
 
-`init` builds the image from a **`container.nix`** in the current directory — a
-`{ pkgs, nur }` function returning the package list (`nur` is
-[NUR](https://github.com/nix-community/NUR), for packages outside nixpkgs). It
-is **required**; there is no default set.
+`init` builds the image from a **`container.nix`** in the current directory — an
+attrset with a `packages` function (`{ pkgs, nur }` returning the package list;
+`nur` is [NUR](https://github.com/nix-community/NUR), for packages outside
+nixpkgs) and an optional `mounts` list. It is **required**; there is no default.
 
 ```nix
 # ./container.nix
-{ pkgs, nur }: with pkgs; [
-  git
-  go
-  nur.repos.charmbracelet.crush
-]
+{
+  packages = { pkgs, nur }: with pkgs; [
+    git
+    go
+    nur.repos.charmbracelet.crush
+  ];
+  # Extra "host:container" bind mounts, on top of $PWD → /workspace. A leading
+  # ~/ in the host path expands to $HOME. Optional.
+  mounts = [
+    "~/data:/data"
+  ];
+}
 ```
 
 Your **host login shell** (detected by `c init`, bash fallback), **coreutils**,
@@ -70,7 +77,8 @@ nix run github:ilyakooo0/nix-container -- start
   directory at `/workspace` (the container's working directory).
 - `--ssh` forwards your host SSH agent socket into the container (so `git` over
   SSH works with your keys).
-- Add more mounts by passing them through (mounts can only be set at creation):
+- Add more mounts persistently via `mounts` in `container.nix` (above), or
+  ad-hoc by passing them through to `create` (mounts can only be set at creation):
 
   ```sh
   nix run github:ilyakooo0/nix-container -- init -v $HOME/data:/data
@@ -99,7 +107,7 @@ name — in [`flake.nix`](./flake.nix). The flake also exposes build helpers:
 
   ```sh
   drv=$(nix build --no-link --print-out-paths --impure --expr \
-    '(builtins.getFlake "github:ilyakooo0/nix-container").lib.${builtins.currentSystem}.copyWith (import ./container.nix)')
+    '(builtins.getFlake "github:ilyakooo0/nix-container").lib.${builtins.currentSystem}.copyWith (import ./container.nix).packages')
   $drv/bin/copy-to docker://ghcr.io/me/img:latest
   ```
 - `lib.<system>.mkImage <name> <shell>` → the underlying OCI image (`copyWith`

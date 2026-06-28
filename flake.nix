@@ -176,10 +176,11 @@
             default = flake-utils.lib.mkApp { drv = cApp; };
           };
 
-          # Build helpers honour a per-project `container.nix`. `c init` uses
+          # Build helpers take a `{ pkgs, nur }: [ ... ]` packages function (the
+          # `packages` attr of a project's `container.nix`). `c init` uses
           # `copyWithShell` (host shell baked in); `copyWith` is the generic form:
           #   (builtins.getFlake "github:…/nix-container")
-          #     .lib.<system>.copyWith (import ./container.nix)
+          #     .lib.<system>.copyWith (import ./container.nix).packages
           lib = {
             inherit mkImage;
             # Build the image's `copyTo` script (a skopeo-copy wrapper) from a

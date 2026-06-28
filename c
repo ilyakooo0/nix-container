@@ -1,7 +1,7 @@
 #!/usr/bin/env fish
 # Manage a container named after the current directory.
 #   c init [-c FILE] [extra create args]   build + load the image, then (re)create it
-#                                          (packages from FILE, default ./container.nix)
+#                                          (config from FILE, default ./container.nix)
 #   c start                                start it and attach
 
 set -l name (path basename $PWD)
@@ -22,8 +22,8 @@ switch $argv[1]
         end
 
         if not test -e $config
-            echo "c: package file not found: $config" >&2
-            echo "    create one ('{ pkgs, nur }: [ ... ]') or pass -c FILE" >&2
+            echo "c: config file not found: $config" >&2
+            echo "    create one ('{ packages = { pkgs, nur }: [ ... ]; mounts = [ ]; }') or pass -c FILE" >&2
             exit 1
         end
 
@@ -33,12 +33,12 @@ switch $argv[1]
         set -l shell bash
         test -n "$SHELL"; and set shell (path basename $SHELL)
 
-        # Build an image with the packages from $config (plus the shell) into a
+        # Build an image with the config's `packages` (plus the shell) into a
         # temp dir, load it, then clean up.
         set -l tmp (mktemp -d)
         set -l archive $tmp/image.tar.gz
         set -lx NIX_CONTAINER_PKGS (path resolve $config)
-        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWithShell \"nix-container-$name\" \"$shell\" (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\"))"
+        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWithShell \"nix-container-$name\" \"$shell\" (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\")).packages"
         set -l copyer (nix build --impure --no-link --print-out-paths --expr "$expr")
         set -l rc $status
         if test $rc -eq 0
@@ -53,8 +53,13 @@ switch $argv[1]
         rm -rf $tmp
         test $rc -eq 0; or exit $rc
 
-        # Mount the project at /workspace (the default cwd).
+        # Mount the project at /workspace (the default cwd), plus any extra
+        # mounts from the config (`mounts = [ "host:container" … ]`). A leading
+        # ~/ in the host path expands to $HOME (nix leaves it literal).
         set -l mounts -v "$PWD:/workspace"
+        for m in (nix eval --impure --raw --expr "builtins.concatStringsSep \"\n\" ((import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\")).mounts or [])")
+            set -a mounts -v (string replace -r '^~/' "$HOME/" -- $m)
+        end
 
         # TERM to bake into the container env (`-e TERM`): the runtime hands the
         # `start -ai` session a bare "xterm", so set the host's real terminal,
