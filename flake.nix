@@ -84,12 +84,21 @@
             # No welcome banner.
             set -g fish_greeting
 
-            # The container runtime hands fish a bare TERM=xterm (8 colors) and
-            # no COLORTERM, washing out colors. The bundled terminfo DB (via
-            # ncurses) has the 256-color entry, so promote xterm→xterm-256color
-            # and advertise truecolor for 24-bit-aware tools.
-            if test "$TERM" = xterm; or test -z "$TERM"
-                set -gx TERM xterm-256color
+            # Pick a TERM whose terminfo entry actually exists in the bundled
+            # database, so TUIs render with the right capabilities (otherwise
+            # they glitch on redraw). The container runtime strips the host TERM
+            # down to a bare "xterm"; `c` forwards the real value as HOST_TERM.
+            # Ghostty reports "xterm-ghostty", but ncurses ships that entry under
+            # the name "ghostty", so map it. Prefer HOST_TERM over the runtime's
+            # bare "xterm" placeholder, falling back to xterm-256color.
+            for term_candidate in $HOST_TERM $TERM xterm-256color
+                test "$term_candidate" = xterm; and continue
+                set -l entry $term_candidate
+                test "$entry" = xterm-ghostty; and set entry ghostty
+                if infocmp $entry >/dev/null 2>&1
+                    set -gx TERM $entry
+                    break
+                end
             end
             set -q COLORTERM; or set -gx COLORTERM truecolor
 
@@ -156,6 +165,11 @@
                     # /etc/services. Without these, hostname resolution fails.
                     pkgsLinux.fakeNss
                     pkgsLinux.iana-etc
+                    # Terminfo tools (infocmp/tput/clear/reset). The terminfo DB
+                    # itself already ships via fish's ncurses dependency; this
+                    # puts the lookup tools on PATH so the prompt init can pick a
+                    # TERM entry that exists, and TUIs get correct capabilities.
+                    pkgsLinux.ncurses
                   ];
                 # Link all of /etc so the above files (nsswitch.conf, protocols,
                 # services, passwd, group, ssl certs, fish prompt) are present.

@@ -55,7 +55,10 @@ switch $argv[1]
         # Replace any existing container of the same name. The image's cmd is
         # /bin/fish, so no command is passed.
         container rm --force $name 2>/dev/null
-        container create --name $name --ssh -it --memory 8g --cwd /workspace $mounts $argv $image
+        # Forward the host terminal type: the runtime strips $TERM down to a
+        # bare "xterm", so pass the real value as HOST_TERM for the fish init to
+        # recover (see prompt.fish) — TUIs need the matching terminfo entry.
+        container create --name $name --ssh -it -e "HOST_TERM=$TERM" --memory 8g --cwd /workspace $mounts $argv $image
     case start
         container start -ai $name
     case '*'
