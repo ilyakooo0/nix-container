@@ -53,10 +53,8 @@ switch $argv[1]
         rm -rf $tmp
         test $rc -eq 0; or exit $rc
 
-        # Mount the project at /workspace (the default cwd) and host ~/.config.
-        # (fish runs with --no-config, so the mount can't shadow the prompt.)
+        # Mount the project at /workspace (the default cwd).
         set -l mounts -v "$PWD:/workspace"
-        test -d $HOME/.config; and set -a mounts -v "$HOME/.config:/root/.config"
 
         # Replace any existing container of the same name. The image's cmd is
         # /bin/fish, so no command is passed.
