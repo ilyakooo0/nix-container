@@ -5,9 +5,10 @@ A Nix flake that builds an **OCI image** (via
 Apple's [`container`](https://github.com/apple/container) CLI on macOS.
 
 It's a plain, single-process image — no NixOS, no systemd — defined in
-[`flake.nix`](./flake.nix). `c init` detects your host login shell, bundles it,
-and runs it by default; `c start` drops you into a [`zellij`](https://zellij.dev)
-session. You choose what else it ships via a per-project `container.nix`.
+[`flake.nix`](./flake.nix). `c start` drops you into a
+[`zellij`](https://zellij.dev) session whose panes use your host login shell
+(detected and bundled by `c init`). You choose what else it ships via a
+per-project `container.nix`.
 
 ## Prerequisites
 
