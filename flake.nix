@@ -76,65 +76,15 @@
           imageName = "nix-container";
           imageTag = "latest";
 
-          # Fish prompt config. Installed at /etc/fish/prompt.fish and loaded via
-          # `fish --no-config --init-command` (see `cmd` below), NOT from
-          # $HOME/.config/fish — so the `~/.config` mount can't shadow it. Built
-          # on the host arch (just a text file), so no Linux builder is needed.
-          fishConfig = pkgsHost.writeText "prompt.fish" ''
-            # No welcome banner.
-            set -g fish_greeting
-
-            # Pick a TERM whose terminfo entry actually exists in the bundled
-            # database, so TUIs render with the right capabilities (otherwise
-            # they glitch on redraw). The container runtime strips the host TERM
-            # down to a bare "xterm"; `c` forwards the real value as HOST_TERM.
-            # Ghostty reports "xterm-ghostty", but ncurses ships that entry under
-            # the name "ghostty", so map it. Prefer HOST_TERM over the runtime's
-            # bare "xterm" placeholder, falling back to xterm-256color.
-            for term_candidate in $HOST_TERM $TERM xterm-256color
-                test "$term_candidate" = xterm; and continue
-                set -l entry $term_candidate
-                test "$entry" = xterm-ghostty; and set entry ghostty
-                if infocmp $entry >/dev/null 2>&1
-                    set -gx TERM $entry
-                    break
-                end
-            end
-            set -q COLORTERM; or set -gx COLORTERM truecolor
-
-            # Define the prompt as a function so fish renders it before every
-            # command; at top level it would run once at startup and be ignored.
-            function fish_prompt
-                set -l nix_shell_info
-                if set -q IN_NIX_SHELL; or set -q IN_NIX_RUN
-                    set nix_shell_info ' ❄️'
-                end
-
-                set -l cwd (prompt_pwd)
-
-                set -l bookmark_info
-                if jj root 2>/dev/null >/dev/null
-                    set -l jj_bookmark (jj log -r 'heads(::@ & bookmarks())' -T 'local_bookmarks ++ "\n"' --no-graph 2>/dev/null | tail -1)
-                    if test -n "$jj_bookmark"
-                        set bookmark_info ' ' (set_color brmagenta) $jj_bookmark (set_color normal)
-                    end
-                end
-
-                echo -n -s (set_color $fish_color_cwd) $cwd (set_color normal) $bookmark_info ' 🏗️' $nix_shell_info '> '
-            end
-          '';
-
-          # Lay the prompt out at the path the cmd sources.
-          fishRoot = pkgsHost.runCommand "fish-prompt" { } ''
-            mkdir -p "$out/etc/fish"
-            cp ${fishConfig} "$out/etc/fish/prompt.fish"
-          '';
-
-          # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function.
-          # The image always runs /bin/fish; fish, its prompt config, and Nix are
-          # bundled automatically, so `container.nix` lists only your extras.
+          # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function,
+          # for the named shell. The shell is the image's `cmd` (a PID1 that just
+          # holds the container open — `c start` execs the real session into it)
+          # and the default `$SHELL`; it's added automatically, so `container.nix`
+          # lists only your extras. Nix (+ CA certs) and the ncurses terminfo
+          # database are always shipped too. Nothing here is fish-specific: the
+          # TERM fixup now happens host-side in `c` (passed via `-e TERM`).
           mkImage =
-            packages:
+            shell: packages:
             n2c.buildImage {
               name = imageName;
               tag = imageTag;
@@ -144,10 +94,6 @@
               # buildEnv only *symlinks* paths (never runs them), so build it on
               # the host arch — the tree is arch-neutral and links the
               # (substituted) Linux store paths, sparing the Linux builder.
-              #
-              # Always shipped: fish (the cmd) + its prompt, and Nix (+ CA certs)
-              # so every container can use Nix; `initializeNixDatabase` registers
-              # the baked store.
               copyToRoot = pkgsHost.buildEnv {
                 name = "root";
                 paths =
@@ -155,24 +101,25 @@
                     pkgs = pkgsLinux;
                     nur = nurPkgs;
                   }
+                  # The shell (cmd + $SHELL), when it exists in nixpkgs.
+                  ++ pkgsLinux.lib.optional (pkgsLinux ? ${shell}) pkgsLinux.${shell}
                   ++ [
-                    pkgsLinux.fish
-                    fishRoot
                     pkgsLinux.nix
                     pkgsLinux.cacert
+                    # Basic userland (ls, cat, cp, sleep, …) so the container is
+                    # usable out of the box and tools that shell out don't fail.
+                    pkgsLinux.coreutils-full
                     # Networking glue glibc needs: /etc/nsswitch.conf (+passwd,
                     # group) so DNS/host lookups resolve, and /etc/protocols,
                     # /etc/services. Without these, hostname resolution fails.
                     pkgsLinux.fakeNss
                     pkgsLinux.iana-etc
-                    # Terminfo tools (infocmp/tput/clear/reset). The terminfo DB
-                    # itself already ships via fish's ncurses dependency; this
-                    # puts the lookup tools on PATH so the prompt init can pick a
-                    # TERM entry that exists, and TUIs get correct capabilities.
+                    # The terminfo database (+ tput/clear/reset) so TUIs find the
+                    # entry for whatever TERM `c` passes in and render correctly.
                     pkgsLinux.ncurses
                   ];
                 # Link all of /etc so the above files (nsswitch.conf, protocols,
-                # services, passwd, group, ssl certs, fish prompt) are present.
+                # services, passwd, group, ssl certs) are present.
                 pathsToLink = [
                   "/bin"
                   "/etc"
@@ -183,26 +130,19 @@
 
               config = {
                 # `cmd` (not `entrypoint`): the default command, *replaced* by any
-                # command passed to `container run/create`. `--no-config` skips
-                # $HOME/.config/fish (so a mounted ~/.config can't override the
-                # prompt); `--init-command` loads the bundled prompt instead.
-                cmd = [
-                  "/bin/fish"
-                  "--no-config"
-                  "--init-command"
-                  "source /etc/fish/prompt.fish"
-                ];
+                # command passed to `container run/create`. It's the detected
+                # shell — as PID1 it just holds the container open; `c start`
+                # execs the real interactive session (zellij) into it.
+                cmd = [ "/bin/${shell}" ];
                 env = [
                   "PATH=/bin"
                   "HOME=/root"
-                  # Default shell for tools that spawn one (zellij panes, etc.);
-                  # without it they fall back to /bin/sh.
-                  "SHELL=/bin/fish"
+                  # Default shell for tools that spawn one (zellij panes, etc.).
+                  "SHELL=/bin/${shell}"
                   # Marker so shells/scripts can detect they're in here.
                   "NIX_CONTAINER=1"
-                  # Advertise truecolor so `container exec` sessions (which don't
-                  # source the fish init) still get 24-bit color. TERM is fixed up
-                  # in the fish prompt init, since the runtime overrides it here.
+                  # Advertise truecolor for 24-bit-aware tools; `c` passes the
+                  # resolved TERM via -e (the runtime would otherwise force xterm).
                   "COLORTERM=truecolor"
                   # A UTF-8 locale so tools handle multibyte/wide characters
                   # correctly. glibc ships C.UTF-8 built in, so this needs no
@@ -240,17 +180,13 @@
           lib = {
             inherit mkImage;
             # skopeo copy app (`skopeo copy nix:<image> "$@"`) for an image built
-            # from a `{ pkgs, nur }: [ ... ]` function.
-            copyWith = packages: (mkImage packages).copyTo;
-            # Like `copyWith`, but also adds the named shell package (when it
-            # exists in nixpkgs) so `c init` can make the host shell available
-            # without it being listed in `container.nix`.
-            copyWithShell =
-              shell: packages:
-              (mkImage (
-                { pkgs, nur }:
-                packages { inherit pkgs nur; } ++ pkgs.lib.optional (pkgs ? ${shell}) pkgs.${shell}
-              )).copyTo;
+            # from a `{ pkgs, nur }: [ ... ]` function. Defaults the shell (cmd +
+            # $SHELL) to bash; use `copyWithShell` to pick another.
+            copyWith = packages: (mkImage "bash" packages).copyTo;
+            # Like `copyWith`, but for the named shell — `c init` passes the host
+            # login shell, which is added to the image and used as cmd + $SHELL
+            # without being listed in `container.nix`.
+            copyWithShell = shell: packages: (mkImage shell packages).copyTo;
           };
         }
       );

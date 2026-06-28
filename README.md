@@ -5,8 +5,9 @@ A Nix flake that builds an **OCI image** (via
 Apple's [`container`](https://github.com/apple/container) CLI on macOS.
 
 It's a plain, single-process image — no NixOS, no systemd — defined in
-[`flake.nix`](./flake.nix). It runs `fish` by default (with a configured
-prompt); you choose what else it ships via a per-project `container.nix`.
+[`flake.nix`](./flake.nix). `c init` detects your host login shell, bundles it,
+and runs it by default; `c start` drops you into a [`zellij`](https://zellij.dev)
+session. You choose what else it ships via a per-project `container.nix`.
 
 ## Prerequisites
 
@@ -40,9 +41,10 @@ is **required**; there is no default set.
 ]
 ```
 
-**fish** (the default command, with a configured prompt) and **Nix** itself
-(with CA certs and `nix-command`/`flakes` enabled, single-user) are always
-included — no need to list them.
+Your **host login shell** (detected by `c init`, bash fallback), **coreutils**,
+**Nix** itself (with CA certs and `nix-command`/`flakes` enabled, single-user),
+and the ncurses **terminfo** database are always included — no need to list them.
+`c start` launches [`zellij`](https://zellij.dev), so include it in `container.nix`.
 
 Point at a different file with `-c`/`--config`:
 
@@ -59,7 +61,7 @@ that holds a `container.nix`; the container is named after that directory.
 # build the image, load it, and create the container (named after $PWD):
 nix run github:ilyakooo0/nix-container -- init
 
-# start it and attach — drops you into fish:
+# start it and attach — drops you into a zellij session:
 nix run github:ilyakooo0/nix-container -- start
 ```
 
