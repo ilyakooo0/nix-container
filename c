@@ -37,8 +37,8 @@ switch $argv[1]
         # temp dir, load it, then clean up.
         set -l tmp (mktemp -d)
         set -l archive $tmp/image.tar.gz
-        set -lx NIX_CONTAINER_PKGS (path resolve $config)
-        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWithShell \"nix-container-$name\" \"$shell\" (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\")).packages"
+        set -lx NIX_CONTAINER_CONFIG (path resolve $config)
+        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWithShell \"nix-container-$name\" \"$shell\" (import (/. + builtins.getEnv \"NIX_CONTAINER_CONFIG\")).packages"
         set -l copyer (nix build --impure --no-link --print-out-paths --expr "$expr")
         set -l rc $status
         if test $rc -eq 0
@@ -57,7 +57,7 @@ switch $argv[1]
         # mounts from the config (`mounts = [ "host:container" … ]`). A leading
         # ~/ in the host path expands to $HOME (nix leaves it literal).
         set -l mounts -v "$PWD:/workspace"
-        for m in (nix eval --impure --raw --expr "builtins.concatStringsSep \"\n\" ((import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\")).mounts or [])")
+        for m in (nix eval --impure --raw --expr "builtins.concatStringsSep \"\n\" ((import (/. + builtins.getEnv \"NIX_CONTAINER_CONFIG\")).mounts or [])")
             set -a mounts -v (string replace -r '^~/' "$HOME/" -- $m)
         end
 
