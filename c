@@ -60,7 +60,15 @@ switch $argv[1]
         # recover (see prompt.fish) — TUIs need the matching terminfo entry.
         container create --name $name --ssh -it -e "HOST_TERM=$TERM" --memory 8g --cwd /workspace $mounts $argv $image
     case start
-        container start -ai $name
+        # Boot the container detached (its PID1 fish keeps it alive), then attach
+        # an interactive shell with `exec -it`. `container start -ai` has no `-t`
+        # flag, so it never hands the guest a properly sized TTY: the real window
+        # size isn't delivered via the TIOCGWINSZ ioctl, so ioctl-based TUIs
+        # (crossterm/ncurses — helix, zellij, btop…) see 0×0 and render garbled,
+        # misaligned output. `exec -it` opens a real, correctly sized TTY.
+        container start $name >/dev/null 2>&1; or exit 1
+        container exec -it --cwd /workspace $name \
+            /bin/fish --no-config --init-command "source /etc/fish/prompt.fish"
     case '*'
         echo "usage: c init [-c FILE] [create args] | start" >&2
         exit 1
