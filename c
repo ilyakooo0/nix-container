@@ -71,9 +71,14 @@ switch $argv[1]
         # size isn't delivered via the TIOCGWINSZ ioctl, so ioctl-based TUIs
         # (crossterm/ncurses — helix, zellij, btop…) see 0×0 and render garbled,
         # misaligned output. `exec -it` opens a real, correctly sized TTY.
+        #
+        # Launch zellij as the session. We go through fish's init first so the
+        # TERM fixup in prompt.fish runs (otherwise zellij gets the runtime's bare
+        # "xterm"), then `exec zellij` replaces fish — and if zellij fails to
+        # start, fish stays interactive as a fallback.
         container start $name >/dev/null 2>&1; or exit 1
         container exec -it --cwd /workspace $name \
-            /bin/fish --no-config --init-command "source /etc/fish/prompt.fish"
+            /bin/fish --no-config --init-command "source /etc/fish/prompt.fish; exec zellij"
     case '*'
         echo "usage: c init [-c FILE] [create args] | start" >&2
         exit 1
