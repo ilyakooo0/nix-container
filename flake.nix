@@ -84,6 +84,15 @@
             # No welcome banner.
             set -g fish_greeting
 
+            # The container runtime hands fish a bare TERM=xterm (8 colors) and
+            # no COLORTERM, washing out colors. The bundled terminfo DB (via
+            # ncurses) has the 256-color entry, so promote xterm→xterm-256color
+            # and advertise truecolor for 24-bit-aware tools.
+            if test "$TERM" = xterm; or test -z "$TERM"
+                set -gx TERM xterm-256color
+            end
+            set -q COLORTERM; or set -gx COLORTERM truecolor
+
             # Define the prompt as a function so fish renders it before every
             # command; at top level it would run once at startup and be ignored.
             function fish_prompt
@@ -174,6 +183,10 @@
                   "HOME=/root"
                   # Marker so shells/scripts can detect they're in here.
                   "NIX_CONTAINER=1"
+                  # Advertise truecolor so `container exec` sessions (which don't
+                  # source the fish init) still get 24-bit color. TERM is fixed up
+                  # in the fish prompt init, since the runtime overrides it here.
+                  "COLORTERM=truecolor"
                   # CA trust for every TLS client (curl/git/…) and Nix.
                   "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
                   "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
