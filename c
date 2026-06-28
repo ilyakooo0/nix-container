@@ -50,7 +50,7 @@ switch $argv[1]
         set -l tmp (mktemp -d)
         set -l archive $tmp/image.tar.gz
         set -lx NIX_CONTAINER_PKGS (path resolve $config)
-        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWithShell \"$shell\" (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\"))"
+        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWithShell \"nix-container-$name\" \"$shell\" (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\"))"
         set -l copyer (nix build --impure --no-link --print-out-paths --expr "$expr")
         set -l rc $status
         if test $rc -eq 0
@@ -68,10 +68,11 @@ switch $argv[1]
         # Mount the project at /workspace (the default cwd).
         set -l mounts -v "$PWD:/workspace"
 
-        # Replace any existing container of the same name. The image's cmd is the
-        # detected shell (holds the container open), so no command is passed.
+        # Replace any existing container of the same name. The image's cmd is
+        # zellij (`c start` attaches to it), so no command is passed here.
         container rm --force $name 2>/dev/null
-        # -e TERM: the runtime would otherwise force a bare "xterm" (see above).
+        # -e TERM: baked into the container env so `container start -ai` gets it
+        # (the runtime would otherwise force a bare "xterm").
         #
         # The image only lays down /bin and /etc, so /tmp and /run don't exist;
         # without them anything that writes temp files (zellij, build tools, …)
@@ -79,19 +80,10 @@ switch $argv[1]
         container create --name $name --ssh -it -e "TERM=$term" \
             --tmpfs /tmp --tmpfs /run --memory 8g --cwd /workspace $mounts $argv $image
     case start
-        # Boot the container detached (its PID1 shell keeps it alive), then attach
-        # the session with `exec -it`. `container start -ai` has no `-t` flag, so
-        # it never hands the guest a properly sized TTY: the real window size
-        # isn't delivered via the TIOCGWINSZ ioctl, so ioctl-based TUIs
-        # (crossterm/ncurses — helix, zellij, btop…) see 0×0 and render garbled,
-        # misaligned output. `exec -it` opens a real, correctly sized TTY, and
-        # `-e TERM` gives it the right terminal type.
-        #
-        # When the session exits, stop the container so it doesn't linger (the
-        # PID1 shell would otherwise keep it running); `c start` boots it again.
-        container start $name >/dev/null 2>&1; or exit 1
-        container exec -it -e "TERM=$term" --cwd /workspace $name zellij
-        container stop $name >/dev/null 2>&1
+        # Start the container and attach to its cmd (zellij). TERM was baked into
+        # the container env at create time (`-e TERM`), which survives this path.
+        # Exiting zellij (PID1) stops the container; `c start` boots it again.
+        container start -ai $name
     case '*'
         echo "usage: c init [-c FILE] [create args] | start" >&2
         exit 1

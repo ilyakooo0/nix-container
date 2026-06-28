@@ -90,18 +90,19 @@ nix run github:ilyakooo0/nix-container -- init
 ## Customize further
 
 Fork or clone to change what isn't per-project — `config.cmd`/`env` or the image
-name — in [`flake.nix`](./flake.nix). The flake also exposes build helpers, both
-taking a `{ pkgs, nur }: [ ... ]` function:
+name — in [`flake.nix`](./flake.nix). The flake also exposes build helpers:
 
-- `lib.<system>.mkImage` → an OCI image.
-- `lib.<system>.copyWith` → a skopeo copy app, for building/pushing the image
-  anywhere skopeo can write (e.g. a registry):
+- `lib.<system>.copyWith` → a skopeo copy app for a `{ pkgs, nur }: [ ... ]`
+  function, for building/pushing the image anywhere skopeo can write (e.g. a
+  registry):
 
   ```sh
   drv=$(nix build --no-link --print-out-paths --impure --expr \
     '(builtins.getFlake "github:ilyakooo0/nix-container").lib.${builtins.currentSystem}.copyWith (import ./container.nix)')
   $drv/bin/copy-to docker://ghcr.io/me/img:latest
   ```
+- `lib.<system>.mkImage <name> <shell>` → the underlying OCI image (`copyWith`
+  defaults these to `nix-container` / `bash`).
 
 The flake uses `flake-utils` over `{aarch64,x86_64}-{darwin,linux}`; the host
 system maps to the matching Linux target automatically (an Intel Mac builds an

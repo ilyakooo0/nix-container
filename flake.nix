@@ -72,21 +72,22 @@
           # Host package set, for the wrapper app below.
           pkgsHost = nixpkgs.legacyPackages.${system};
 
-          # Name/tag baked into the image's OCI config.
+          # Default image name (for `copyWith`); `c init` passes a per-directory
+          # name (`nix-container-<dir>`) to `copyWithShell` instead.
           imageName = "nix-container";
           imageTag = "latest";
 
-          # Build the OCI image from a `{ pkgs, nur }: [ ... ]` package function,
-          # for the named shell. The shell is the image's `cmd` (a PID1 that just
-          # holds the container open — `c start` execs the real session into it)
-          # and the default `$SHELL`; it's added automatically, so `container.nix`
+          # Build the OCI image (named `name`) from a `{ pkgs, nur }: [ ... ]`
+          # package function, for the named shell. The image's `cmd` is zellij
+          # (the session `c start` attaches to); the shell is the default `$SHELL`
+          # (what zellij panes spawn) and is added automatically, so `container.nix`
           # lists only your extras. Nix (+ CA certs) and the ncurses terminfo
           # database are always shipped too. Nothing here is fish-specific: the
-          # TERM fixup now happens host-side in `c` (passed via `-e TERM`).
+          # TERM fixup happens host-side in `c` (passed via `-e TERM` at create).
           mkImage =
-            shell: packages:
+            name: shell: packages:
             n2c.buildImage {
-              name = imageName;
+              inherit name;
               tag = imageTag;
               inherit arch;
 
@@ -132,10 +133,10 @@
 
               config = {
                 # `cmd` (not `entrypoint`): the default command, *replaced* by any
-                # command passed to `container run/create`. It's the detected
-                # shell — as PID1 it just holds the container open; `c start`
-                # execs the real interactive session (zellij) into it.
-                cmd = [ "/bin/${shell}" ];
+                # command passed to `container run/create`. It's zellij — the
+                # session `c start` attaches to via `container start -ai`; exiting
+                # it (PID1) stops the container.
+                cmd = [ "/bin/zellij" ];
                 env = [
                   "PATH=/bin"
                   "HOME=/root"
@@ -182,13 +183,14 @@
           lib = {
             inherit mkImage;
             # Build the image's `copyTo` script (a skopeo-copy wrapper) from a
-            # `{ pkgs, nur }: [ ... ]` function. Defaults the shell (cmd + $SHELL)
-            # to bash; use `copyWithShell` to pick another.
-            copyWith = packages: (mkImage "bash" packages).copyTo;
-            # Like `copyWith`, but for the named shell — `c init` passes the host
-            # login shell, which is added to the image and used as cmd + $SHELL
-            # without being listed in `container.nix`.
-            copyWithShell = shell: packages: (mkImage shell packages).copyTo;
+            # `{ pkgs, nur }: [ ... ]` function, named `imageName`. Defaults the
+            # shell (cmd + $SHELL) to bash; use `copyWithShell` to pick another.
+            copyWith = packages: (mkImage imageName "bash" packages).copyTo;
+            # Like `copyWith`, but for the given image `name` and shell — `c init`
+            # passes `nix-container-<dir>` and the host login shell, which is added
+            # to the image and used as cmd + $SHELL without being listed in
+            # `container.nix`.
+            copyWithShell = name: shell: packages: (mkImage name shell packages).copyTo;
           };
         }
       );
