@@ -55,7 +55,7 @@ switch $argv[1]
         # Replace any existing container of the same name. The image's cmd is
         # /bin/fish, so no command is passed.
         container rm --force $name 2>/dev/null
-        container create --name $name --ssh -it --cpus 8 --memory 8g --cwd /workspace $mounts $argv $image
+        container create --name $name --ssh -it --memory 8g --cwd /workspace $mounts $argv $image
     case start
         container start -ai $name
     case '*'
