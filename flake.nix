@@ -201,6 +201,10 @@
                   # source the fish init) still get 24-bit color. TERM is fixed up
                   # in the fish prompt init, since the runtime overrides it here.
                   "COLORTERM=truecolor"
+                  # A UTF-8 locale so tools handle multibyte/wide characters
+                  # correctly. glibc ships C.UTF-8 built in, so this needs no
+                  # locale-archive.
+                  "LANG=C.UTF-8"
                   # CA trust for every TLS client (curl/git/…) and Nix.
                   "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
                   "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
