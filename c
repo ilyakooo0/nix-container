@@ -58,7 +58,12 @@ switch $argv[1]
         # Forward the host terminal type: the runtime strips $TERM down to a
         # bare "xterm", so pass the real value as HOST_TERM for the fish init to
         # recover (see prompt.fish) — TUIs need the matching terminfo entry.
-        container create --name $name --ssh -it -e "HOST_TERM=$TERM" --memory 8g --cwd /workspace $mounts $argv $image
+        #
+        # The image only lays down /bin and /etc, so /tmp and /run don't exist;
+        # without them anything that writes temp files (zellij, build tools, …)
+        # fails with ENOENT. Mount writable tmpfs at both.
+        container create --name $name --ssh -it -e "HOST_TERM=$TERM" \
+            --tmpfs /tmp --tmpfs /run --memory 8g --cwd /workspace $mounts $argv $image
     case start
         # Boot the container detached (its PID1 fish keeps it alive), then attach
         # an interactive shell with `exec -it`. `container start -ai` has no `-t`
