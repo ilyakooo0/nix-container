@@ -27,12 +27,18 @@ switch $argv[1]
             exit 1
         end
 
-        # Build an image with the packages from $config into a temp dir, load
-        # it, then clean up.
+        # Host login shell (by name): added to the image automatically and used
+        # as the default shell (what zellij panes etc. spawn), so it needn't be
+        # listed in container.nix. Falls back to bash.
+        set -l shell bash
+        test -n "$SHELL"; and set shell (path basename $SHELL)
+
+        # Build an image with the packages from $config (plus the shell) into a
+        # temp dir, load it, then clean up.
         set -l tmp (mktemp -d)
         set -l archive $tmp/image.tar.gz
         set -lx NIX_CONTAINER_PKGS (path resolve $config)
-        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWith (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\"))"
+        set -l expr "(builtins.getFlake \"$flake\").lib.\${builtins.currentSystem}.copyWithShell \"$shell\" (import (/. + builtins.getEnv \"NIX_CONTAINER_PKGS\"))"
         set -l copyer (nix build --impure --no-link --print-out-paths --expr "$expr")
         set -l rc $status
         if test $rc -eq 0
@@ -62,7 +68,9 @@ switch $argv[1]
         # The image only lays down /bin and /etc, so /tmp and /run don't exist;
         # without them anything that writes temp files (zellij, build tools, …)
         # fails with ENOENT. Mount writable tmpfs at both.
-        container create --name $name --ssh -it -e "HOST_TERM=$TERM" \
+        # SHELL=/bin/<detected> makes the host shell the default (zellij panes,
+        # etc.); it overrides the image's baked-in SHELL=/bin/fish fallback.
+        container create --name $name --ssh -it -e "HOST_TERM=$TERM" -e "SHELL=/bin/$shell" \
             --tmpfs /tmp --tmpfs /run --memory 8g --cwd /workspace $mounts $argv $image
     case start
         # Boot the container detached (its PID1 fish keeps it alive), then attach

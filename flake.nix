@@ -242,6 +242,15 @@
             # skopeo copy app (`skopeo copy nix:<image> "$@"`) for an image built
             # from a `{ pkgs, nur }: [ ... ]` function.
             copyWith = packages: (mkImage packages).copyTo;
+            # Like `copyWith`, but also adds the named shell package (when it
+            # exists in nixpkgs) so `c init` can make the host shell available
+            # without it being listed in `container.nix`.
+            copyWithShell =
+              shell: packages:
+              (mkImage (
+                { pkgs, nur }:
+                packages { inherit pkgs nur; } ++ pkgs.lib.optional (pkgs ? ${shell}) pkgs.${shell}
+              )).copyTo;
           };
         }
       );
