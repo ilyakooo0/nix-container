@@ -195,6 +195,9 @@
                 env = [
                   "PATH=/bin"
                   "HOME=/root"
+                  # Default shell for tools that spawn one (zellij panes, etc.);
+                  # without it they fall back to /bin/sh.
+                  "SHELL=/bin/fish"
                   # Marker so shells/scripts can detect they're in here.
                   "NIX_CONTAINER=1"
                   # Advertise truecolor so `container exec` sessions (which don't
