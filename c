@@ -28,7 +28,7 @@ switch $argv[1]
         end
 
         # Host login shell (by name): added to the image automatically and baked
-        # in as the cmd + default $SHELL (what zellij panes etc. spawn), so it
+        # in as the cmd + default $SHELL (what herdr panes etc. spawn), so it
         # needn't be listed in container.nix. Falls back to bash.
         set -l shell bash
         test -n "$SHELL"; and set shell (path basename $SHELL)
@@ -74,19 +74,19 @@ switch $argv[1]
         end
 
         # Replace any existing container of the same name, then create it running
-        # zellij in a session named after the project (`<dir>-container`). This
-        # overrides the image's default plain-zellij cmd; `c start` attaches to it.
+        # herdr in a session named after the project (`<dir>-container`). This
+        # overrides the image's default plain-herdr cmd; `c start` attaches to it.
         container rm --force $name 2>/dev/null
         # The image only lays down /bin and /etc, so /tmp and /run don't exist;
-        # without them anything that writes temp files (zellij, build tools, …)
+        # without them anything that writes temp files (herdr, build tools, …)
         # fails with ENOENT. Mount writable tmpfs at both.
         container create --name $name --ssh -it -e "TERM=$term" \
             --tmpfs /tmp --tmpfs /run --memory 8g --cwd /workspace $mounts $argv \
-            $image /bin/zellij --session "$name-container"
+            $image /bin/herdr session attach "$name-container"
     case start
-        # Start the container and attach to its cmd (zellij). TERM was baked into
+        # Start the container and attach to its cmd (herdr). TERM was baked into
         # the container env at create time (`-e TERM`), which survives this path.
-        # Exiting zellij (PID1) stops the container; `c start` boots it again.
+        # Exiting herdr (PID1) stops the container; `c start` boots it again.
         container start -ai $name
     case '*'
         echo "usage: c init [-c FILE] [create args] | start" >&2

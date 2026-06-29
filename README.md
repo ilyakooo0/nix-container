@@ -6,7 +6,7 @@ Apple's [`container`](https://github.com/apple/container) CLI on macOS.
 
 It's a plain, single-process image — no NixOS, no systemd — defined in
 [`flake.nix`](./flake.nix). `c start` drops you into a
-[`zellij`](https://zellij.dev) session whose panes use your host login shell
+[`herdr`](https://herdr.dev) session whose panes use your host login shell
 (detected and bundled by `c init`). You choose what else it ships via a
 per-project `container.nix`.
 
@@ -49,7 +49,7 @@ nixpkgs) and an optional `mounts` list. It is **required**; there is no default.
 ```
 
 Your **host login shell** (detected by `c init`, bash fallback), **coreutils**,
-[**zellij**](https://zellij.dev) (the session `c start` launches), **Nix** itself
+[**herdr**](https://herdr.dev) (the session `c start` launches), **Nix** itself
 (with CA certs and `nix-command`/`flakes` enabled, single-user), and the ncurses
 **terminfo** database are always included — no need to list them.
 
@@ -68,7 +68,7 @@ that holds a `container.nix`; the container is named after that directory.
 # build the image, load it, and create the container (named after $PWD):
 nix run github:ilyakooo0/nix-container -- init
 
-# start it and attach — drops you into a zellij session:
+# start it and attach — drops you into a herdr session:
 nix run github:ilyakooo0/nix-container -- start
 ```
 

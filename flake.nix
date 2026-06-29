@@ -78,9 +78,9 @@
           imageTag = "latest";
 
           # Build the OCI image (named `name`) from a `{ pkgs, nur }: [ ... ]`
-          # package function, for the named shell. The image's `cmd` is zellij
+          # package function, for the named shell. The image's `cmd` is herdr
           # (the session `c start` attaches to); the shell is the default `$SHELL`
-          # (what zellij panes spawn) and is added automatically, so `container.nix`
+          # (what herdr panes spawn) and is added automatically, so `container.nix`
           # lists only your extras. Nix (+ CA certs) and the ncurses terminfo
           # database are always shipped too. Nothing here is fish-specific: the
           # TERM fixup happens host-side in `c` (passed via `-e TERM` at create).
@@ -119,7 +119,7 @@
                     # entry for whatever TERM `c` passes in and render correctly.
                     pkgsLinux.ncurses
                     # The session `c start` always launches.
-                    pkgsLinux.zellij
+                    pkgsLinux.herdr
                   ];
                 # Link all of /etc so the above files (nsswitch.conf, protocols,
                 # services, passwd, group, ssl certs) are present.
@@ -133,15 +133,15 @@
 
               config = {
                 # `cmd` (not `entrypoint`): the default command, *replaced* by any
-                # command passed to `container run/create`. Plain zellij here;
-                # `c init` overrides it with `zellij --session <dir>-container` so
+                # command passed to `container run/create`. Plain herdr here;
+                # `c init` overrides it with `herdr session attach <dir>-container` so
                 # the session is named per project. `c start` attaches via
-                # `container start -ai`; exiting zellij (PID1) stops the container.
-                cmd = [ "/bin/zellij" ];
+                # `container start -ai`; exiting herdr (PID1) stops the container.
+                cmd = [ "/bin/herdr" ];
                 env = [
                   "PATH=/bin"
                   "HOME=/root"
-                  # Default shell for tools that spawn one (zellij panes, etc.).
+                  # Default shell for tools that spawn one (herdr panes, etc.).
                   "SHELL=/bin/${shell}"
                   # Marker so shells/scripts can detect they're in here.
                   "NIX_CONTAINER=1"
